@@ -1,0 +1,23 @@
+// Compile/test only. Does not depend on jar, remapJar, build or assembleWhiteout.
+gradle.projectsEvaluated {
+ def p=gradle.rootProject
+ def suites=['GroundSnowBillboardTest','GroundSnowWindTest','BarricadeSupportTest',
+             'SharedWindFieldIntegrationTest','AutoDoorAndWindPolicyTest']
+ p.tasks.register('compileVisualRegression', JavaCompile) {
+  dependsOn p.tasks.named('classes')
+  source suites.collect { p.file('tests/'+it+'.java') }
+  classpath=p.sourceSets.main.compileClasspath+p.sourceSets.main.output
+  destinationDirectory=p.layout.buildDirectory.dir('visual-regression')
+  javaCompiler=p.javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }
+ }
+ p.tasks.register('visualRegression')
+ suites.each { name ->
+  p.tasks.register('visual'+name, JavaExec) {
+   dependsOn 'compileVisualRegression'
+   classpath=p.files(p.layout.buildDirectory.dir('visual-regression'))+p.sourceSets.main.output+p.sourceSets.main.compileClasspath
+   mainClass=(name=='BarricadeSupportTest'?'dev.whiteout.power.barricade.':'')+name
+   javaLauncher=p.javaToolchains.launcherFor { languageVersion=JavaLanguageVersion.of(21) }
+  }
+  p.tasks.named('visualRegression') { dependsOn 'visual'+name }
+ }
+}

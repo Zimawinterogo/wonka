@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "ambientocclusion": false,
+  "textures": {
+    "all": "whiteout:block/rime_glass_weather",
+    "particle": "whiteout:block/rime_glass_weather"
+  }
+}

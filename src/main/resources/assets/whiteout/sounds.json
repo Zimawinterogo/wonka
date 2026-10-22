@@ -1,0 +1,271 @@
+{
+  "generator_engine": {
+    "sounds": [
+      {
+        "name": "whiteout:modern_generator_loop",
+        "stream": false,
+        "attenuation_distance": 24
+      }
+    ]
+  },
+  "generator_pull": {
+    "sounds": [
+      {
+        "name": "whiteout:modern_generator_pull",
+        "stream": false
+      }
+    ]
+  },
+  "generator_start": {
+    "sounds": [
+      {
+        "name": "whiteout:modern_generator_start",
+        "stream": false
+      }
+    ]
+  },
+  "generator_stop": {
+    "sounds": [
+      {
+        "name": "whiteout:modern_generator_stop",
+        "stream": false
+      }
+    ]
+  },
+  "generator_fail": {
+    "sounds": [
+      {
+        "name": "whiteout:generator_fail",
+        "stream": false
+      }
+    ]
+  },
+  "modern_generator_fail": {
+    "sounds": [
+      {
+        "name": "whiteout:modern_generator_fail",
+        "stream": false
+      }
+    ]
+  },
+  "fuse_click": {
+    "sounds": [
+      {
+        "name": "whiteout:fuse_click",
+        "stream": false
+      }
+    ]
+  },
+  "music_slot_1": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_1",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_2": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_2",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_3": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_3",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_4": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_4",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_5": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_5",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_6": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_6",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_7": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_7",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_8": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_1",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_9": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_2",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_10": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_3",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_11": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_4",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_12": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_5",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_13": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_6",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_14": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_7",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_15": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_1",
+        "stream": true
+      }
+    ]
+  },
+  "music_slot_16": {
+    "sounds": [
+      {
+        "name": "whiteout:music_slot_2",
+        "stream": true
+      }
+    ]
+  },
+  "radio_wind_static": {
+    "sounds": [
+      {
+        "name": "whiteout:radio_wind_static"
+      }
+    ]
+  },
+  "old_house_creak": {
+    "sounds": [
+      {
+        "name": "whiteout:old_house_creak",
+        "stream": false
+      }
+    ]
+  },
+  "old_window_rattle": {
+    "sounds": [
+      {
+        "name": "whiteout:old_window_rattle",
+        "stream": false
+      }
+    ]
+  },
+  "old_door_slam": {
+    "sounds": [
+      {
+        "name": "whiteout:old_door_slam",
+        "stream": false
+      }
+    ]
+  },
+  "door_ice_crack": {
+    "sounds": [
+      {
+        "name": "whiteout:door_ice_crack",
+        "stream": false
+      }
+    ]
+  },
+  "old_generator_loop": {
+    "sounds": [
+      {
+        "name": "whiteout:old_generator_loop",
+        "stream": false,
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "old_generator_start": {
+    "sounds": [
+      {
+        "name": "whiteout:old_generator_start",
+        "stream": false,
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "old_generator_stop": {
+    "sounds": [
+      {
+        "name": "whiteout:old_generator_stop",
+        "stream": false,
+        "attenuation_distance": 28
+      }
+    ]
+  },
+  "old_generator_catch": {
+    "sounds": [
+      {
+        "name": "whiteout:old_generator_catch",
+        "stream": false,
+        "attenuation_distance": 24
+      }
+    ]
+  },
+  "old_generator_fail": {
+    "sounds": [
+      {
+        "name": "whiteout:old_generator_fail",
+        "stream": false,
+        "attenuation_distance": 24
+      }
+    ]
+  }
+}

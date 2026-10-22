@@ -1,0 +1,27 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.whiteout.power.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["ZoneHistoryMixin"],
+  "client": [
+    "ZoneEditorToolbarMixin",
+    "ZoneCommitMixin",
+    "WhiteoutButtonMixin",
+    "ZoneOldShelterMixin",
+    "GlassWipeMouseMixin",
+    "GlassWipeKeyboardMixin",
+    "ZoneScreenAccess",
+    "BackpackScreenMixin",
+    "BackpackSlotAccess",
+    "BackpackHiddenSlotMixin",
+    "BackpackCameraMixin",
+    "BackpackPlayerPoseMixin",
+    "BackpackFreshCameraMixin",
+    "WeatherDepthCaptureMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "whiteout-visual-refmap.json"
+}

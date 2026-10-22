@@ -1,0 +1,141 @@
+{
+  "dimension": "minecraft:overworld",
+  "panelX": 8311,
+  "panelY": 73,
+  "panelZ": 8304,
+  "generatorX": 8308,
+  "generatorY": 64,
+  "generatorZ": 8306,
+  "panelBound": true,
+  "generatorBound": true,
+  "lamps": [
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8313,
+      "y": 74,
+      "z": 8317,
+      "original": "minecraft:lantern",
+      "vanilla": true,
+      "properties": {
+        "waterlogged": "false",
+        "hanging": "true"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8320,
+      "y": 74,
+      "z": 8317,
+      "original": "minecraft:lantern",
+      "vanilla": true,
+      "properties": {
+        "waterlogged": "false",
+        "hanging": "true"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8321,
+      "y": 74,
+      "z": 8317,
+      "original": "minecraft:lantern",
+      "vanilla": true,
+      "properties": {
+        "waterlogged": "false",
+        "hanging": "true"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8322,
+      "y": 74,
+      "z": 8314,
+      "original": "minecraft:lantern",
+      "vanilla": true,
+      "properties": {
+        "waterlogged": "false",
+        "hanging": "true"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8311,
+      "y": 74,
+      "z": 8304,
+      "original": "furniture:lamp_wall_green",
+      "vanilla": false,
+      "properties": {
+        "waterlogged": "false",
+        "lit": "false",
+        "facing": "west"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8319,
+      "y": 74,
+      "z": 8311,
+      "original": "furniture:lamp_wall_green",
+      "vanilla": false,
+      "properties": {
+        "waterlogged": "false",
+        "lit": "false",
+        "facing": "north"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8308,
+      "y": 78,
+      "z": 8308,
+      "original": "furniture:lamp_wall_white",
+      "vanilla": false,
+      "properties": {
+        "waterlogged": "false",
+        "lit": "false",
+        "facing": "east"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8308,
+      "y": 78,
+      "z": 8310,
+      "original": "furniture:lamp_wall_white",
+      "vanilla": false,
+      "properties": {
+        "waterlogged": "false",
+        "lit": "false",
+        "facing": "east"
+      }
+    },
+    {
+      "dimension": "minecraft:overworld",
+      "x": 8321,
+      "y": 77,
+      "z": 8307,
+      "original": "furniture:lamp_white",
+      "vanilla": false,
+      "properties": {
+        "waterlogged": "false",
+        "lit": "false",
+        "type": "none"
+      }
+    }
+  ],
+  "pendingRestores": [],
+  "triggerSet": false,
+  "fired": false,
+  "questDone": false,
+  "triggerX": 0,
+  "triggerY": 0,
+  "triggerZ": 0,
+  "radius": 3,
+  "fuseLocationSet": false,
+  "fuseX": 0,
+  "fuseY": 0,
+  "fuseZ": 0,
+  "burntPending": false,
+  "questStep": "",
+  "armed": true
+}

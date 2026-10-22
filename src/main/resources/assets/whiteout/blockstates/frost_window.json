@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "frost=0": {
+      "model": "whiteout:block/frost_window_0"
+    },
+    "frost=1": {
+      "model": "whiteout:block/frost_window_1"
+    },
+    "frost=2": {
+      "model": "whiteout:block/frost_window_2"
+    },
+    "frost=3": {
+      "model": "whiteout:block/frost_window_3"
+    }
+  }
+}

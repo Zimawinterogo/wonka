@@ -1,0 +1,1 @@
+PASS 3835 connected-geometry checks (all masks, negative Y, 1x1/1x2/2x1/2x2).

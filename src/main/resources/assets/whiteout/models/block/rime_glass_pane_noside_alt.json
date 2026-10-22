@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/template_glass_pane_noside_alt",
+  "textures": {
+    "pane": "whiteout:block/rime_glass_weather",
+    "edge": "whiteout:block/rime_glass_weather"
+  }
+}

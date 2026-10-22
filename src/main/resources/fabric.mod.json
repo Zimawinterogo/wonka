@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "whiteout_power_build",
+  "version": "3.12.10",
+  "name": "Whiteout — Белая мгла",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.whiteout.power.PowerDevices",
+      "dev.whiteout.power.bolt.DoorBolts",
+      "dev.whiteout.power.barricade.Barricades"
+    ],
+    "client": [
+      "dev.whiteout.power.PowerClient",
+      "dev.whiteout.power.bolt.DoorBoltClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "mixins": [
+    "whiteout-visual.mixins.json"
+  ]
+}

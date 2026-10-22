@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": { "I": { "item": "minecraft:iron_ingot" }, "N": { "item": "minecraft:iron_nugget" } },
+  "pattern": [ "  N", "III" ],
+  "result": { "id": "whiteout:door_bolt", "count": 1 }
+}

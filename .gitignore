@@ -12,3 +12,6 @@ TEST-RESULTS-*.txt
 RELEASE-MANIFEST-*.json
 BUILD-STATUS-*.txt
 GRADLE-BUILD-STATUS-*.txt
+
+# Private recordings remain local.
+src/main/resources/assets/whiteout/sounds/music_slot_*.ogg

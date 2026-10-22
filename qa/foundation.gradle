@@ -1,0 +1,24 @@
+// Compile/test only; never invokes a release JAR task.
+gradle.projectsEvaluated {
+ def p=gradle.rootProject
+ p.tasks.register('compileFoundationTests', JavaCompile) {
+  dependsOn p.tasks.named('classes')
+  source p.fileTree('tests') { include 'BarricadeCollisionTest.java'; include 'BarricadeSupportTest.java'; include 'WorldState*Test.java' }
+  classpath=p.sourceSets.main.compileClasspath+p.sourceSets.main.output
+  destinationDirectory=p.layout.buildDirectory.dir('foundation-tests')
+  javaCompiler=p.javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }
+ }
+ p.tasks.register('foundationTests')
+ ['dev.whiteout.power.barricade.BarricadeCollisionTest','dev.whiteout.power.barricade.BarricadeSupportTest'].each { name ->
+  def taskName='foundation'+name.tokenize('.').last()
+  p.tasks.register(taskName,JavaExec) {
+   dependsOn 'compileFoundationTests'
+   classpath=p.files(p.layout.buildDirectory.dir('foundation-tests'))+p.sourceSets.main.output+p.sourceSets.main.compileClasspath
+   mainClass=name
+   javaLauncher=p.javaToolchains.launcherFor { languageVersion=JavaLanguageVersion.of(21) }
+  }
+  // The Minecraft bootstrap probe requires Fabric runtime access transformations.
+  // Keep it explicitly invokable; standalone policy tests do not launch Minecraft.
+  if(!name.endsWith('BarricadeCollisionTest'))p.tasks.named('foundationTests') { dependsOn taskName }
+ }
+}

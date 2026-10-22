@@ -1,0 +1,36 @@
+{
+  "variants": {
+    "facing=north,active=false": {
+      "model": "whiteout:block/old_generator",
+      "y": 0
+    },
+    "facing=north,active=true": {
+      "model": "whiteout:block/old_generator_on",
+      "y": 0
+    },
+    "facing=east,active=false": {
+      "model": "whiteout:block/old_generator",
+      "y": 90
+    },
+    "facing=east,active=true": {
+      "model": "whiteout:block/old_generator_on",
+      "y": 90
+    },
+    "facing=south,active=false": {
+      "model": "whiteout:block/old_generator",
+      "y": 180
+    },
+    "facing=south,active=true": {
+      "model": "whiteout:block/old_generator_on",
+      "y": 180
+    },
+    "facing=west,active=false": {
+      "model": "whiteout:block/old_generator",
+      "y": 270
+    },
+    "facing=west,active=true": {
+      "model": "whiteout:block/old_generator_on",
+      "y": 270
+    }
+  }
+}

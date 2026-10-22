@@ -1,0 +1,17 @@
+// Compile/test only: never assembles the release JAR.
+gradle.projectsEvaluated {
+ def p=gradle.rootProject
+ p.tasks.register('compileGroundSnowAudit', JavaCompile) {
+  dependsOn p.tasks.named('classes')
+  source p.file('tests/GroundSnowWindTest.java')
+  classpath=p.sourceSets.main.compileClasspath+p.sourceSets.main.output
+  destinationDirectory=p.layout.buildDirectory.dir('ground-snow-audit')
+  javaCompiler=p.javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }
+ }
+ p.tasks.register('groundSnowAudit', JavaExec) {
+  dependsOn 'compileGroundSnowAudit'
+  classpath=p.files(p.layout.buildDirectory.dir('ground-snow-audit'))+p.sourceSets.main.output+p.sourceSets.main.compileClasspath
+  mainClass='GroundSnowWindTest'
+  javaLauncher=p.javaToolchains.launcherFor { languageVersion=JavaLanguageVersion.of(21) }
+ }
+}

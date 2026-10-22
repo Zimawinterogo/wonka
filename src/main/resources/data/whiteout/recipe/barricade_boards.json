@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "N": {
+      "item": "minecraft:iron_nugget"
+    }
+  },
+  "pattern": [
+    "PPP",
+    "N N"
+  ],
+  "result": {
+    "id": "whiteout:barricade_boards",
+    "count": 2
+  }
+}

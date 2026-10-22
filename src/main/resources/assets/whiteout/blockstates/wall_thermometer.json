@@ -1,0 +1,20 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "whiteout:block/wall_thermometer",
+      "y": 0
+    },
+    "facing=east": {
+      "model": "whiteout:block/wall_thermometer",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "whiteout:block/wall_thermometer",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "whiteout:block/wall_thermometer",
+      "y": 270
+    }
+  }
+}
