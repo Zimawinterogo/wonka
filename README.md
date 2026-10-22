@@ -1,4 +1,4 @@
-# Whiteout 3.12.11 — Minecraft 1.21.1 / Fabric / Java 21
+# Whiteout 3.12.12 — Minecraft 1.21.1 / Fabric / Java 21
 
 Синхронизированы физические формы соединённых баррикад; добавлен серверный
 read-only `WhiteoutWorldState` с immutable snapshots и ограниченным кешированием.
