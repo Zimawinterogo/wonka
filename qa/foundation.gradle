@@ -32,7 +32,8 @@ gradle.projectsEvaluated {
  p.tasks.register('foundationBarricadeCollisionTest') { dependsOn 'foundationFabricBootstrap' }
  ['dev.whiteout.power.barricade.BarricadeSupportTest',
   'dev.whiteout.power.WorldStateCacheTest','dev.whiteout.power.WorldStateSnapshotTest',
-  'dev.whiteout.power.WorldStateLifecycleTest','dev.whiteout.power.CrisisConditionsTest'].each { name ->
+  'dev.whiteout.power.WorldStateLifecycleTest','dev.whiteout.power.CrisisConditionsTest',
+  'dev.whiteout.power.CrisisDirectorTest','dev.whiteout.power.CrisisSettingsTest'].each { name ->
   def taskName='foundation'+name.tokenize('.').last()
   p.tasks.register(taskName,JavaExec) {
    dependsOn 'compileFoundationTests'

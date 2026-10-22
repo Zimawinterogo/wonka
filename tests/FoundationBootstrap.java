@@ -10,6 +10,8 @@ public final class FoundationBootstrap {
     .getMethod("main",String[].class).invoke(null,(Object)new String[0]);
    Class.forName("dev.whiteout.power.WorldStateDeviceTest",true,game)
     .getMethod("main",String[].class).invoke(null,(Object)new String[0]);
+   Class.forName("dev.whiteout.power.CrisisBootstrapTest",true,game)
+    .getMethod("main",String[].class).invoke(null,(Object)new String[0]);
   } catch(java.lang.reflect.InvocationTargetException ex){
    Throwable cause=ex.getCause();
    if(cause instanceof Error error)throw error;
