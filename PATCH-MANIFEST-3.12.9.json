@@ -1,0 +1,305 @@
+{
+  "version": "3.12.9",
+  "base_archive": "Whiteout-3.12.8-Merged-Clean-Sources.zip",
+  "base_sha256": "60a4296464230931ec54d0567e592dc604dba1ff4063eea49b1e65c3df091b68",
+  "reference_jar": "Whiteout-3.12.8-1.21.1.jar",
+  "reference_jar_sha256": "cc7c59906ae51c65bf7cf63c5c17a972ce36086e791af42dedc38f55ae7a05e3",
+  "release_jar_built": false,
+  "deleted_files": [],
+  "files": [
+    {
+      "path": "BUILD_3.12.8.bat",
+      "action": "replace",
+      "old_sha256": "07d92377bd1e5e8606818711ac170234091ad1951387d5103ae05e803dddedc8",
+      "new_sha256": "58765416343fee2288658a23e55e73f15072f3c56c2334d927a864a3cab6263c"
+    },
+    {
+      "path": "CHECK_3.12.9.bat",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "7fedb87b6e670596cd52d6a87cbb8d793a1ebf6800c231ef56c3664567a34796"
+    },
+    {
+      "path": "README.md",
+      "action": "replace",
+      "old_sha256": "3887a1b1166b834ac98460ad0acc3c939d2939d3056926054cb1549040691840",
+      "new_sha256": "580f9a1a2fd9f95bfc7370277bc0782dc87b87a703b6f92bb1b58644fc702361"
+    },
+    {
+      "path": "build.gradle",
+      "action": "replace",
+      "old_sha256": "539460afb073e89734c66fe6731c451521321aea2263dd83f099c45d3c901e4b",
+      "new_sha256": "c009bfdf4eb7a1882442985cfbc72febb44ccb68046ea7f155f8122c8bb45030"
+    },
+    {
+      "path": "docs/3.12.9-VISUAL-FIXES.md",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "54174405468bf4b9391eb63c1493ee6523c1617618066df5a771f49eb52228e1"
+    },
+    {
+      "path": "docs/qa-3.12.9/geometry-tests.txt",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "6ff2b4a49690da565e2d7dedc09e6792f15016cf7e0e61407e5183d3887cd280"
+    },
+    {
+      "path": "docs/qa-3.12.9/resources.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "82229d337d179946c55a2b6c441abfb56c800a86da7ac17d40cf1fce282b953d"
+    },
+    {
+      "path": "docs/qa-3.12.9/visual-regression.log",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "4dfda56f2cb68463e2d057a799b9e56c2286d5d35761f5c4fdb29692f40a373a"
+    },
+    {
+      "path": "qa/visual-3.12.9.gradle",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "e952292de37761acd1168437a5739b328a93bfb22aee55eec3d8cc89adf9fff3"
+    },
+    {
+      "path": "src/main/java/dev/whiteout/power/GroundSnow.java",
+      "action": "replace",
+      "old_sha256": "1cb80787eae555ed50c982324ba97834c81e437806fc8f95d1455a9f5e6966dc",
+      "new_sha256": "bc255802cb1a6dd688dd90c8f760d034d751040375537545b6af469ad13e76e3"
+    },
+    {
+      "path": "src/main/java/dev/whiteout/power/GroundSnowBillboard.java",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "1b856f5919ab2e76e38887c7b702a0747524b294898221d0c13d7205283bc1ab"
+    },
+    {
+      "path": "src/main/java/dev/whiteout/power/PowerClient.java",
+      "action": "replace",
+      "old_sha256": "c9d12176d9e77482c931d18eb6a56bae2fba0bbdb19b2465d3db7f3b2d07fed8",
+      "new_sha256": "c25df0846629f418ed4ab4bf83f3e1f9d6d737cb3815e419ef68db60f0609689"
+    },
+    {
+      "path": "src/main/java/dev/whiteout/power/barricade/BarricadeModels.java",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "2fdcf06b24c60436adb3535328e99dd857974e71df4194a3e5bbc0b962403d89"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_0.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "4f259bf135cbb90e60fed488d04ac88cb9839945c3283bfde9d5d6911a29b93d"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_1.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "d09e6e57b4b7aac091624ce273c7e5e609a097880f2133f950f0efadc29cf621"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_10.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "93e3a93f84efc286c7f34ee1b8cab687cc17c12f2bff5dc99fff5c132bd4cd17"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_11.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "781c06b37be4a7a1b9ca625b12703938826be59155f0546cbf53c97fbaadb676"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_12.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "8d5f8ae6c0d691137c7d404025ebca4490b01485c2d45404f21490b27680f72c"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_13.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "37dd9cc93258091e3c816cbc669362969a460bf197f658652331a865692bc95b"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_14.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "71f5a4b63ee53262d03625346ec60ffce93a18f29e3f70a961378cf1a217078a"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_15.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "ee549d85d02151625389a59ee1c6268be3b9cadd4bf836f5c5a3d397f793f48f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_2.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "93e3a93f84efc286c7f34ee1b8cab687cc17c12f2bff5dc99fff5c132bd4cd17"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_3.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "781c06b37be4a7a1b9ca625b12703938826be59155f0546cbf53c97fbaadb676"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_4.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "8d5f8ae6c0d691137c7d404025ebca4490b01485c2d45404f21490b27680f72c"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_5.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "37dd9cc93258091e3c816cbc669362969a460bf197f658652331a865692bc95b"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_6.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "71f5a4b63ee53262d03625346ec60ffce93a18f29e3f70a961378cf1a217078a"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_7.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "ee549d85d02151625389a59ee1c6268be3b9cadd4bf836f5c5a3d397f793f48f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_8.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "4f259bf135cbb90e60fed488d04ac88cb9839945c3283bfde9d5d6911a29b93d"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_0_9.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "d09e6e57b4b7aac091624ce273c7e5e609a097880f2133f950f0efadc29cf621"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_0.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "f390eb5b3c98139eebe22e4277c45e53520b47e3defd2f3d87de967ecebc0406"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_1.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "da9390ff00438809b8556a4adf138e9d69806ae7ef1766b2903f6e9167f5166f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_10.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "1b7636b8833e11756cf20261e2ecc06a2a8b8110f5306ed21ffbcaefa5cf0b8f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_11.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "88738abae3e1472a7048baf9dfab92445983ef3475ab52e539044c418be87c06"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_12.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "bf6a1d4d80932c3104231a78df8febfcf9c4b35f6a601dcc02efe5e5483b99ab"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_13.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "b1db8061e81b8714206ca618c5bc19c7979d52d4e0165a32ad26a489fce5ccbf"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_14.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "1b7636b8833e11756cf20261e2ecc06a2a8b8110f5306ed21ffbcaefa5cf0b8f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_15.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "88738abae3e1472a7048baf9dfab92445983ef3475ab52e539044c418be87c06"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_2.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "dc3bc4e94a104d868e07de16935e093c5ce3a6c3ff073eb1aee2537267d8eab0"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_3.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "7c8838cce4bede8fddc14578d71651e2d20a64f49f441b8256874dbddcd5213f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_4.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "f390eb5b3c98139eebe22e4277c45e53520b47e3defd2f3d87de967ecebc0406"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_5.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "da9390ff00438809b8556a4adf138e9d69806ae7ef1766b2903f6e9167f5166f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_6.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "dc3bc4e94a104d868e07de16935e093c5ce3a6c3ff073eb1aee2537267d8eab0"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_7.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "7c8838cce4bede8fddc14578d71651e2d20a64f49f441b8256874dbddcd5213f"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_8.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "bf6a1d4d80932c3104231a78df8febfcf9c4b35f6a601dcc02efe5e5483b99ab"
+    },
+    {
+      "path": "src/main/resources/assets/whiteout/models/block/barricade_connected_1_9.json",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "b1db8061e81b8714206ca618c5bc19c7979d52d4e0165a32ad26a489fce5ccbf"
+    },
+    {
+      "path": "src/main/resources/fabric.mod.json",
+      "action": "replace",
+      "old_sha256": "e7e40aaa9e73c9b8447c57cacba45c4e04812b65a22f752ff1a81f127014fb71",
+      "new_sha256": "27ab2a320150bb8fb48af302fbf5a7626b8543537f7fa5e7d230df1a086135d1"
+    },
+    {
+      "path": "tests/GroundSnowBillboardTest.java",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "0f75d0a161471523fed1d033cba17cc949c0fec2cd8586d9a43d277e2e8afd65"
+    },
+    {
+      "path": "tests/connected_barricades_test.py",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "f254dd84365f1821ca33fee23b83278c2fc57087f263a3859c025aeba5657fb9"
+    },
+    {
+      "path": "tools/make_connected_barricades.py",
+      "action": "add",
+      "old_sha256": null,
+      "new_sha256": "cd3efab290624a5425e15e55aeb5062dc22b8f0237d5f825edad01cef6b3e57c"
+    }
+  ]
+}

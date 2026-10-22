@@ -1,0 +1,14 @@
+.gradle/
+build/
+.idea/
+.vscode/
+*.iml
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+TEST-RESULTS-*.txt
+RELEASE-MANIFEST-*.json
+BUILD-STATUS-*.txt
+GRADLE-BUILD-STATUS-*.txt

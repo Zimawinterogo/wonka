@@ -1,0 +1,19 @@
+Whiteout 3.12.6 — Auto-close + wind
+
+Changes from 3.12.5:
+- AutoDoorPolicy.java, AutoClosingDoors.java: regular doors close 210 ticks after opening.
+  ElectricDoors.isManaged() explicitly protects all Whiteout electricity-bound iron/copper doors.
+  Living entities (players and NPCs) prevent closing. Redstone-powered doors are not forced shut.
+  Door tracking checks only opened doors and a small neighbourhood around active players every 20 ticks.
+- WindMovementPolicy.java, WindMovement.java: server-side movement speed modifier only outdoors
+  during an active blizzard and only when walking against wind. Max penalty 8%; no knockback.
+  No effect for Creative/Spectator, flying, water, vehicles or outside blizzard zones.
+  New operator command: /whiteout atmosphere wind-movement <true|false>
+- Tests: AutoDoorAndWindPolicyTest.java (14 standalone assertions).
+
+Tests executed: javac --release 21 syntax audit of 109 source files PASS;
+standalone Java policy tests PASS.
+Full Gradle build NOT executed: Gradle distribution unavailable and network inaccessible.
+No Minecraft/Fabric/Iris runtime tests executed. Read docs/3.12.6-MANUAL-TESTS.md.
+Release JAR not included; run gradlew.bat clean build on a machine with Gradle cache/network.
+Only source changes; original music and base 3.4.2 binary kept unchanged.

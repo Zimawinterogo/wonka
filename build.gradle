@@ -1,0 +1,579 @@
+import org.objectweb.asm.*
+import org.objectweb.asm.tree.*
+
+plugins { id 'fabric-loom' version '1.8.13' }
+loom { mixin { defaultRefmapName = 'whiteout-visual-refmap.json' } }
+version = '3.12.9'
+group = 'dev.whiteout'
+base { archivesName = 'whiteout-power' }
+repositories { mavenCentral() }
+dependencies {
+ minecraft 'com.mojang:minecraft:1.21.1'
+ mappings 'net.fabricmc:yarn:1.21.1+build.3:v2'
+ modImplementation 'net.fabricmc:fabric-loader:0.18.4'
+ modImplementation 'net.fabricmc.fabric-api:fabric-api:0.116.17+1.21.1'
+ modCompileOnly files('base/Whiteout-3.4.2-1.21.1.jar')
+}
+java { toolchain.languageVersion = JavaLanguageVersion.of(21); withSourcesJar() }
+// Ask javac for a complete error list in one compile pass, not just the first 100.
+tasks.withType(JavaCompile).configureEach { options.release = 21; options.compilerArgs += ['-Xmaxerrs', '1000'] }
+
+// This module is compiled/remapped normally, then merged into the exact existing release.
+// Preserve base assets/classes except the explicit, signature-checked patches below.
+tasks.register('assembleWhiteout') {
+ dependsOn tasks.remapJar
+ def output=layout.buildDirectory.file("release/Whiteout-${project.version}-1.21.1.jar")
+ outputs.file(output)
+ inputs.file(file('base/Whiteout-3.4.2-1.21.1.jar'))
+ inputs.file(tasks.remapJar.archiveFile)
+ doLast {
+  def baseFile=file('base/Whiteout-3.4.2-1.21.1.jar')
+  if(!baseFile.isFile())throw new GradleException('Missing base/Whiteout-3.4.2-1.21.1.jar')
+  def entries=new LinkedHashMap<String,byte[]>()
+  def baseZip=new java.util.zip.ZipFile(baseFile)
+  try { baseZip.entries().each { e->if(!e.directory)entries[e.name]=baseZip.getInputStream(e).bytes } } finally {baseZip.close()}
+  def json=new groovy.json.JsonSlurper()
+  def metadata=json.parse(entries['fabric.mod.json'])
+  if(metadata.id!='whiteout'||metadata.version!='3.4.2')throw new GradleException('Expected Whiteout 3.4.2 base')
+  // This private soundtrack configuration removes placeholder OGG before adding
+  // the seven real recordings. Other ambient/SFX resources remain unchanged.
+  entries.keySet().removeAll { it.startsWith('assets/whiteout/sounds/music_slot_') && it.endsWith('.ogg') }
+  // Legacy music definitions are replaced by real tracks or compatibility aliases.
+  def baseSoundMap=json.parse(entries['assets/whiteout/sounds.json'])
+  baseSoundMap.keySet().removeAll { it.startsWith('music_slot_') }
+  entries['assets/whiteout/sounds.json']=groovy.json.JsonOutput.toJson(baseSoundMap).getBytes('UTF-8')
+  // Approved, SHA-256-pinned overrides of the original glass/weather shaders.
+  // Never silently replace an unrelated base asset or a different Whiteout build.
+  def shaderHashes=[
+    'assets/whiteout/shaders/snow.frag':'1c4c6cae6dd17e686687ce09f706c3db1b7d5c25e754ecba5e34eed8192f70fd',
+    'assets/whiteout/shaders/winter.fsh':'56a3b3771365b4cadbcbf04b495ff7a9b8f5abbac9af057e9a099fcea6a1551e'
+  ]
+  // 3.12.0: these five item textures are intentional replacements of the
+  // pinned 3.4.2 resources. All other texture collisions remain fatal.
+  def itemTextureBaseHashes=[
+    'assets/whiteout/textures/item/battery.png':'800476fdf19f7253c77bf59f581028c8b3d5f45ba14aad12f164aeaffb66769c',
+    'assets/whiteout/textures/item/goggles.png':'14976559ce2b90fe86bdf6a6bc0e2958e2a35f1f870b67e19bbd5d94acf36356',
+    'assets/whiteout/textures/item/headlamp.png':'4d49a91c002388e5ce119b13b2e55251fdc671061615677dbe120a2c3bf67a3d',
+    'assets/whiteout/textures/item/meteoresonator.png':'b532828575cc295e41cc07b774e2c27e0ba81a4fdc4fe9e16f89623fa2d6cac1',
+    'assets/whiteout/textures/item/radio.png':'7062de2d3f66bd99253a6ee1465dfb004075147fa634966c8afff41ac80a5728'
+  ]
+  def patchZip=new java.util.zip.ZipFile(tasks.remapJar.archiveFile.get().asFile)
+  try {
+   patchZip.entries().each { e->
+    if(!e.directory&&(e.name=='dev/whiteout/MusicCatalog.class'||e.name=='dev/whiteout/client/CustomMusicManager.class'||e.name=='dev/whiteout/client/MusicLibraryScreen.class'||e.name.startsWith('dev/whiteout/power/')||e.name.startsWith('assets/whiteout/')||e.name.startsWith('data/whiteout/')||e.name.startsWith('data/minecraft/tags/block/mineable/')||e.name=='whiteout-visual.mixins.json'||e.name=='whiteout-visual-refmap.json')) {
+     def data=patchZip.getInputStream(e).bytes
+     if(entries.containsKey(e.name)&&(e.name=='assets/whiteout/sounds.json'||e.name.startsWith('assets/whiteout/lang/'))) {
+      def merged=json.parse(entries[e.name]);merged.putAll(json.parse(data));data=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(merged)).getBytes('UTF-8')
+     } else if(entries.containsKey(e.name)&&(e.name.startsWith('assets/whiteout/sounds/')||e.name.startsWith('data/whiteout/'))&&!java.util.Arrays.equals(entries[e.name],data))throw new GradleException('Changed existing asset: '+e.name)
+     else if(entries.containsKey(e.name)&&shaderHashes.containsKey(e.name)) {
+      def originalHash=java.security.MessageDigest.getInstance('SHA-256').digest(entries[e.name]).encodeHex().toString()
+      if(originalHash!=shaderHashes[e.name])throw new GradleException('Shader base changed unexpectedly: '+e.name)
+     }
+     else if(entries.containsKey(e.name)&&itemTextureBaseHashes.containsKey(e.name)) {
+      def originalHash=java.security.MessageDigest.getInstance('SHA-256').digest(entries[e.name]).encodeHex().toString()
+      if(originalHash!=itemTextureBaseHashes[e.name])
+       throw new GradleException('Item texture base changed unexpectedly: '+e.name)
+     }
+     else if(entries.containsKey(e.name)&&!(e.name in ['dev/whiteout/MusicCatalog.class','dev/whiteout/client/CustomMusicManager.class','dev/whiteout/client/MusicLibraryScreen.class'])&&!e.name.startsWith('dev/whiteout/power/')&&!e.name.startsWith('assets/whiteout/blockstates/')&&!e.name.startsWith('assets/whiteout/models/')&&!e.name.startsWith('assets/whiteout/sounds/')&&!e.name.startsWith('data/whiteout/'))throw new GradleException('Unexpected collision: '+e.name)
+     entries[e.name]=data
+    }
+   }
+  } finally {patchZip.close()}
+  // 3.10.7: patch actual base Whiteout server zone save and client weather update.
+  // These classes come from the pinned 3.4.2 base, not from the patch module.
+  def networkName='dev/whiteout/net/WhiteoutNetwork.class'
+  if(!entries.containsKey(networkName)||!entries.containsKey('dev/whiteout/client/WeatherState.class'))
+    throw new GradleException('Missing original base zone classes for 3.10.7 repairs')
+  def netNode=new ClassNode()
+  new ClassReader(entries[networkName]).accept(netNode,0)
+  int zoneSaveFixes=0
+  netNode.methods.each { m->
+   m.instructions.toArray().each { node->
+    if(node instanceof MethodInsnNode && node.opcode==Opcodes.INVOKESTATIC &&
+       node.owner=='dev/whiteout/net/WhiteoutNetwork' && node.name=='saveZones' &&
+       node.desc=='(Ldev/whiteout/Store;Ljava/util/List;)V'){
+      // Before the original save call the operand stack is [Store,List].
+      // DUP2 allows preserve() to mutate the pending list while retaining
+      // untouched operands for saveZones(). Covers SAVE_ZONE and DELETE_ZONE.
+      def injected=new InsnList()
+      injected.add(new InsnNode(Opcodes.DUP2))
+      injected.add(new MethodInsnNode(Opcodes.INVOKESTATIC,'dev/whiteout/power/ZoneOrder',
+        'preserve','(Ldev/whiteout/Store;Ljava/util/List;)V',false))
+      m.instructions.insertBefore(node,injected)
+      zoneSaveFixes++
+    }
+   }
+  }
+  if(zoneSaveFixes!=2)throw new GradleException('Base SAVE_ZONE layout changed: expected 2, found '+zoneSaveFixes)
+  def nw=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  netNode.accept(nw)
+  entries[networkName]=nw.toByteArray()
+  def stateName='dev/whiteout/client/WeatherState.class'
+  def stateNode=new ClassNode()
+  new ClassReader(entries[stateName]).accept(stateNode,0)
+  int weatherTickFixes=0
+  stateNode.methods.each { m->
+   if(m.name=='tick'&&m.desc=='(Lnet/minecraft/class_310;)V'){
+    m.instructions.toArray().each { node->
+     if(node.opcode==Opcodes.RETURN){
+      def injected=new InsnList()
+      injected.add(new VarInsnNode(Opcodes.ALOAD,0))
+      injected.add(new MethodInsnNode(Opcodes.INVOKESTATIC,'dev/whiteout/power/ZoneSeamRepair',
+        'afterTick','(Lnet/minecraft/class_310;)V',false))
+      m.instructions.insertBefore(node,injected)
+      weatherTickFixes++
+     }
+    }
+   }
+  }
+  if(weatherTickFixes<1)throw new GradleException('Base WeatherState.tick layout changed')
+  def ww=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  stateNode.accept(ww)
+  entries[stateName]=ww.toByteArray()
+  if(!entries.containsKey('dev/whiteout/power/ZoneOrder.class')||
+     !entries.containsKey('dev/whiteout/power/ZoneSeamRepair.class'))
+    throw new GradleException('Missing 3.10.7 zone repair helpers')
+
+  // Keep the original GL snowfall renderer active through glass while the
+  // camera is sheltered. The base roof-height occlusion still clips indoor snow.
+  def snowName='dev/whiteout/client/SnowRenderer.class'
+  if(!entries.containsKey(snowName))throw new GradleException('Missing base SnowRenderer')
+  def snowNode=new ClassNode()
+  new ClassReader(entries[snowName]).accept(snowNode,0)
+  int snowFeed=0,stormFeed=0
+  snowNode.methods.each { m->
+   if(m.name=='draw')m.instructions.toArray().each { node->
+    if(node instanceof FieldInsnNode && node.opcode==Opcodes.GETSTATIC &&
+       node.owner=='dev/whiteout/client/WeatherState' && node.desc=='F' &&
+       (node.name=='snow'||node.name=='storm')){
+     String name=node.name
+     m.instructions.set(node,new MethodInsnNode(Opcodes.INVOKESTATIC,
+       'dev/whiteout/power/ExteriorWeatherFeed',name,'()F',false))
+     if(name=='snow')snowFeed++
+     else stormFeed++
+    }
+   }
+  }
+  if(snowFeed!=1||stormFeed!=1)throw new GradleException('SnowRenderer feed signature mismatch: '+snowFeed+'/'+stormFeed)
+  def snowWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  snowNode.accept(snowWriter)
+  entries[snowName]=snowWriter.toByteArray()
+
+  // The postprocess gate must also receive exterior snowfall; otherwise it can
+  // return before SnowRenderer.draw is reached inside a shelter.
+  def winterName='dev/whiteout/client/WinterEffect.class'
+  def winterNode=new ClassNode()
+  new ClassReader(entries[winterName]).accept(winterNode,0)
+  int winterFeed=0,depthFix=0
+  winterNode.methods.each { m->
+   if(m.name=='render')m.instructions.toArray().each { node->
+    if(node instanceof FieldInsnNode && node.opcode==Opcodes.GETSTATIC &&
+       node.owner=='dev/whiteout/client/WeatherState' && node.desc=='F' &&
+       (node.name=='snow'||node.name=='storm')){
+     m.instructions.set(node,new MethodInsnNode(Opcodes.INVOKESTATIC,
+       'dev/whiteout/power/ExteriorWeatherFeed',node.name,'()F',false))
+     winterFeed++
+    }else if(node instanceof MethodInsnNode && node.owner=='dev/whiteout/client/OpaqueDepthSelector' && node.name=='select'){
+     node.owner='dev/whiteout/power/WeatherDepth';depthFix++
+    }
+   }
+  }
+  if(winterFeed!=3||depthFix!=1)throw new GradleException('WinterEffect layout changed: '+winterFeed+'/'+depthFix)
+  def winterWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  winterNode.accept(winterWriter)
+  entries[winterName]=winterWriter.toByteArray()
+
+  // Existing meteoresonator zone screen gets an actual folder button and
+  // a display-only filter. The underlying zone list is NEVER overwritten.
+  def zoneScreenName='dev/whiteout/client/ZoneScreen.class'
+  if(!entries.containsKey(zoneScreenName))throw new GradleException('Missing original ZoneScreen')
+  def zoneScreenNode=new ClassNode()
+  new ClassReader(entries[zoneScreenName]).accept(zoneScreenNode,0)
+  int foldersButton=0, foldersFilter=0
+  int folderFirstRedirects=0
+  zoneScreenNode.methods.each { m->
+   if(m.name=='method_25426'&&m.desc=='()V'){
+    // Do not land on the global zone list: show folder selection first.
+    // Selected folders still open the original editor normally.
+    // Call without adding bytecode branches: the pinned base class has
+    // existing stack-map frames, and creating a new jump without recomputing
+    // those frames would cause VerifyError when Minecraft opens the UI.
+    def first=new InsnList()
+    first.add(new VarInsnNode(Opcodes.ALOAD,0))
+    first.add(new MethodInsnNode(Opcodes.INVOKESTATIC,'dev/whiteout/power/ZoneFoldersClient',
+      'redirectUnfiledEditor','(Ldev/whiteout/client/ZoneScreen;)V',false))
+    m.instructions.insert(first)
+    folderFirstRedirects++
+    m.instructions.toArray().each { node->
+     if(node instanceof FieldInsnNode&&node.opcode==Opcodes.GETSTATIC&&
+        node.owner=='dev/whiteout/client/Bridge'&&node.name=='snapshot'&&
+        node.next instanceof FieldInsnNode && node.next.name=='zones'){
+      // Once per init, add a native button to the original list pane.
+      def button=new InsnList()
+      button.add(new VarInsnNode(Opcodes.ALOAD,0))
+      button.add(new VarInsnNode(Opcodes.ALOAD,0))
+      button.add(new FieldInsnNode(Opcodes.GETFIELD,'dev/whiteout/client/ZoneScreen','left','I'))
+      button.add(new VarInsnNode(Opcodes.ALOAD,0))
+      button.add(new FieldInsnNode(Opcodes.GETFIELD,'dev/whiteout/client/ZoneScreen','top','I'))
+      button.add(new IntInsnNode(Opcodes.SIPUSH,224))
+      button.add(new InsnNode(Opcodes.IADD))
+      button.add(new IntInsnNode(Opcodes.SIPUSH,132))
+      button.add(new LdcInsnNode('Папки зон'))
+      button.add(new MethodInsnNode(Opcodes.INVOKESTATIC,'dev/whiteout/power/ZoneFoldersClient','opener','()Ljava/lang/Runnable;',false))
+      button.add(new MethodInsnNode(Opcodes.INVOKESPECIAL,'dev/whiteout/client/ZoneScreen','button',
+        '(IIILjava/lang/String;Ljava/lang/Runnable;)V',false))
+      m.instructions.insertBefore(node,button);foldersButton++
+     }
+     if(node instanceof VarInsnNode && node.opcode==Opcodes.ASTORE && node.var==1 &&
+        node.previous instanceof FieldInsnNode && node.previous.name=='zones'){
+      def filter=new InsnList()
+      filter.add(new VarInsnNode(Opcodes.ALOAD,1))
+      filter.add(new MethodInsnNode(Opcodes.INVOKESTATIC,'dev/whiteout/power/ZoneFoldersClient','visible',
+        '(Ljava/util/List;)Ljava/util/List;',false))
+      filter.add(new VarInsnNode(Opcodes.ASTORE,1))
+      m.instructions.insert(node,filter);foldersFilter++
+     }
+    }
+   }
+  }
+  if(folderFirstRedirects!=1)throw new GradleException('Folder first entrypoint missing')
+  if(foldersButton!=1||foldersFilter!=1)throw new GradleException('ZoneScreen layout mismatch: '+foldersButton+'/'+foldersFilter)
+  def foldersWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  zoneScreenNode.accept(foldersWriter)
+  entries[zoneScreenName]=foldersWriter.toByteArray()
+
+  // Patch verified Whiteout 3.4.2 dialogue classes in the FULL release.
+  // Using ASM avoids a second dialogue UI and preserves all old screens/assets.
+  def managerName='dev/whiteout/client/DialogueManager.class'
+  def screenName='dev/whiteout/client/DialogueScreen.class'
+  if(!entries.containsKey(managerName)||!entries.containsKey(screenName))
+    throw new GradleException('Missing original Whiteout dialogue classes')
+  def rewriteClass={byte[] bytes,String kind->
+   def cn=new ClassNode()
+   new ClassReader(bytes).accept(cn,0)
+   int routed=0,sped=0,portraits=0
+   cn.methods.each { m->
+    if(kind=='manager'&&(m.name=='open'||m.name=='openDirector')){
+     m.instructions.toArray().each { node->
+      if(node instanceof MethodInsnNode && node.owner=='net/minecraft/class_310' && node.name=='method_1507' && node.desc=='(Lnet/minecraft/class_437;)V'){
+       node.setOpcode(Opcodes.INVOKESTATIC)
+       node.owner='dev/whiteout/power/StoryDialogueHud'
+       node.name='route'
+       node.desc='(Lnet/minecraft/class_310;Lnet/minecraft/class_437;)V'
+       node.itf=false
+       routed++
+      }
+     }
+    }
+    if(kind=='screen'&&m.name=='method_25393'){
+     m.instructions.toArray().each { node->
+      if(node.opcode==Opcodes.GETFIELD && node instanceof FieldInsnNode && node.name=='ticks' && node.next?.opcode==Opcodes.ICONST_1 && node.next?.next?.opcode==Opcodes.IADD){
+       m.instructions.set(node.next,new InsnNode(Opcodes.ICONST_2))
+       sped++
+      }
+     }
+    }
+    if(kind=='screen'&&m.name=='drawBubble'){
+     m.instructions.toArray().each { node->
+      // Replace the ORIGINAL glyph draw at the avatar position. Unlike the
+      // old end-of-method overlay, a successful skin render never draws "Я".
+      if(node instanceof MethodInsnNode && node.owner=='net/minecraft/class_332' &&
+         node.name=='method_25300' && node.desc=='(Lnet/minecraft/class_327;Ljava/lang/String;III)V'){
+       def args=new InsnList()
+       args.add(new VarInsnNode(Opcodes.ALOAD,5)) // Bubble record
+       args.add(new VarInsnNode(Opcodes.ALOAD,0))
+       args.add(new FieldInsnNode(Opcodes.GETFIELD,'dev/whiteout/client/DialogueScreen','entity','Lnet/minecraft/class_1297;'))
+       args.add(new VarInsnNode(Opcodes.ILOAD,9)) // portrait tile X
+       args.add(new VarInsnNode(Opcodes.ILOAD,4)) // bubble Y
+       args.add(new IntInsnNode(Opcodes.BIPUSH,6))
+       args.add(new InsnNode(Opcodes.IADD))
+       m.instructions.insertBefore(node,args)
+       node.setOpcode(Opcodes.INVOKESTATIC)
+       node.owner='dev/whiteout/power/StoryPortraits'
+       node.name='drawAvatar'
+       node.desc='(Lnet/minecraft/class_332;Lnet/minecraft/class_327;Ljava/lang/String;IIILjava/lang/Object;Lnet/minecraft/class_1297;II)V'
+       node.itf=false
+       portraits++
+      }
+     }
+    }
+   }
+   if(kind=='manager'&&routed!=2)throw new GradleException('Expected two non-NPC dialogue entry points, found '+routed)
+   if(kind=='screen'&&(sped!=1||portraits!=1))throw new GradleException('DialogueScreen baseline mismatch (speed='+sped+', portraits='+portraits+')')
+   def cw=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+   cn.accept(cw)
+   return cw.toByteArray()
+  }
+  entries[managerName]=rewriteClass(entries[managerName],'manager')
+  entries[screenName]=rewriteClass(entries[screenName],'screen')
+  // Use canonical soundtrack ID for continuity between different zones.
+  // 3.4.2 built its MusicSession key from the numeric slot ("music:8"),
+  // although slot 8 can resolve to the same OGG as slot 1. Normalize only
+  // the session key: keep the original sound/event choice for playback.
+  def audioName='dev/whiteout/client/ZoneAudio.class'
+  if(!entries.containsKey(audioName))throw new GradleException('Missing original ZoneAudio')
+  def audioNode=new ClassNode()
+  new ClassReader(entries[audioName]).accept(audioNode,0)
+  int musicKeyPatches=0
+  audioNode.methods.each { m->
+   if(m.name=='tick' && m.desc=='(Ldev/whiteout/Zone;)V'){
+    m.instructions.toArray().each { node->
+     // ASTORE 5 follows the ternary that computes the current music key.
+     if(node instanceof VarInsnNode && node.opcode==Opcodes.ASTORE && node.var==5){
+      m.instructions.insertBefore(node,new MethodInsnNode(Opcodes.INVOKESTATIC,
+        'dev/whiteout/power/ZoneMusicContinuity','canonicalKey',
+        '(Ljava/lang/String;)Ljava/lang/String;',false))
+      musicKeyPatches++
+     }
+    }
+   }
+  }
+  if(musicKeyPatches!=1)throw new GradleException('Unexpected ZoneAudio session key construction: '+musicKeyPatches)
+  def audioWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  audioNode.accept(audioWriter)
+  entries[audioName]=audioWriter.toByteArray()
+  if(!entries.containsKey('dev/whiteout/power/ZoneMusicContinuity.class'))
+   throw new GradleException('Missing music continuity implementation')
+  // Non-blocking, dialogue-only Director scenes must never seize the camera.
+  def playerName='dev/whiteout/client/director/DirectorPlayer.class'
+  if(!entries.containsKey(playerName))throw new GradleException('Missing DirectorPlayer base class')
+  def playerNode=new ClassNode()
+  new ClassReader(entries[playerName]).accept(playerNode,0)
+  int playerPatches=0
+  playerNode.methods.each { m->
+   if(m.name=='play'&&m.desc=='(Ldev/whiteout/client/director/DirectorScene;)Z'){
+    def resume=new LabelNode()
+    def injected=new InsnList()
+    injected.add(new VarInsnNode(Opcodes.ALOAD,0))
+    injected.add(new MethodInsnNode(Opcodes.INVOKESTATIC,'dev/whiteout/power/DialogueTriggers','playSimpleScene','(Ldev/whiteout/client/director/DirectorScene;)Z',false))
+    injected.add(new JumpInsnNode(Opcodes.IFEQ,resume))
+    injected.add(new InsnNode(Opcodes.ICONST_1))
+    injected.add(new InsnNode(Opcodes.IRETURN))
+    injected.add(resume)
+    injected.add(new FrameNode(Opcodes.F_SAME,0,null,0,null))
+    m.instructions.insert(injected)
+    playerPatches++
+   }
+  }
+  if(playerPatches!=1)throw new GradleException('Unexpected DirectorPlayer.play signature: '+playerPatches)
+  def playerWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  playerNode.accept(playerWriter)
+  entries[playerName]=playerWriter.toByteArray()
+  // Heal Forest Edge used to DELETE exposed spruce logs; route it through
+  // the original Undo/transaction, but repair from Whiteout's real stamp.
+  def plotName='dev/whiteout/plot/PlotTools.class'
+  if(!entries.containsKey(plotName))throw new GradleException('Missing original PlotTools')
+  def plotNode=new ClassNode()
+  new ClassReader(entries[plotName]).accept(plotNode,0)
+  def healMethod=plotNode.methods.find {it.name=='healForestEdgeImmediate' &&
+    it.desc=='(Lnet/minecraft/class_3218;Ldev/whiteout/plot/PlotRegion;I)I'}
+  if(healMethod==null)throw new GradleException('Unexpected PlotTools healing signature')
+  // MOVE/SWAP in Whiteout 3.4.2 call healForestEdgeImmediate() automatically
+  // in lambda$move$0 and lambda$swap$1. Disable ONLY these four invocations:
+  // Heal Forest Edge remains available explicitly via its original command.
+  int autoHealCalls=0
+  plotNode.methods.each { m->
+   if(m.name in ['lambda$move$0','lambda$swap$1']) {
+    m.instructions.toArray().each { ins->
+     if(ins instanceof MethodInsnNode && ins.name=='healForestEdgeImmediate'
+       && ins.desc=='(Lnet/minecraft/class_3218;Ldev/whiteout/plot/PlotRegion;I)I') {
+      ins.owner='dev/whiteout/power/ForestStampRepair'
+      ins.name='skipAutomaticHeal'
+      ins.setOpcode(Opcodes.INVOKESTATIC)
+      ins.itf=false
+      autoHealCalls++
+     }
+    }
+   }
+  }
+  if(autoHealCalls!=4)throw new GradleException('Expected four Move/Swap automatic forest healing calls; found '+autoHealCalls)
+  healMethod.instructions.clear()
+  healMethod.tryCatchBlocks.clear()
+  if(healMethod.localVariables!=null)healMethod.localVariables.clear()
+  healMethod.instructions.add(new VarInsnNode(Opcodes.ALOAD,0))
+  healMethod.instructions.add(new VarInsnNode(Opcodes.ALOAD,1))
+  healMethod.instructions.add(new VarInsnNode(Opcodes.ILOAD,2))
+  healMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+    'dev/whiteout/power/ForestStampRepair','heal',
+    '(Lnet/minecraft/class_3218;Ldev/whiteout/plot/PlotRegion;I)I',false))
+  healMethod.instructions.add(new InsnNode(Opcodes.IRETURN))
+  def plotWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  plotNode.accept(plotWriter)
+  entries[plotName]=plotWriter.toByteArray()
+  if(!entries.containsKey('dev/whiteout/power/ForestStampRepair.class'))
+    throw new GradleException('Missing stamp repair implementation')
+  // New building block must survive the base + remapped patch merge.
+  for(String asset : ['assets/whiteout/textures/block/rotten_spruce_planks.png',
+                      'assets/whiteout/models/block/rotten_spruce_planks.json',
+                      'assets/whiteout/models/item/rotten_spruce_planks.json',
+                      'assets/whiteout/blockstates/rotten_spruce_planks.json',
+                      'data/whiteout/loot_table/blocks/rotten_spruce_planks.json']) {
+   if(!entries.containsKey(asset))throw new GradleException('Missing rotten spruce material: '+asset)
+  }
+  // Additional shelter leak hook: applies exposure AFTER weather interpolation and
+  // BEFORE the original SurvivalState.tick reads WeatherState.shelter.
+  def weatherClass='dev/whiteout/client/WeatherState.class'
+  if(!entries.containsKey(weatherClass))throw new GradleException('Missing WeatherState for cold-leak hook')
+  def weatherNode=new ClassNode()
+  new ClassReader(entries[weatherClass]).accept(weatherNode,0)
+  int hooked=0
+  weatherNode.methods.each { method ->
+   if(method.name=='tick'&&method.desc=='(Lnet/minecraft/class_310;)V') {
+    method.instructions.toArray().each { node ->
+     if(node.opcode==Opcodes.RETURN){
+      method.instructions.insertBefore(node,new MethodInsnNode(Opcodes.INVOKESTATIC,
+       'dev/whiteout/power/EnvironmentClient','applyShelter','()V',false))
+      hooked++
+     }
+    }
+   }
+  }
+  if(hooked!=1)throw new GradleException('WeatherState hook expected once; found '+hooked)
+  def weatherWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  weatherNode.accept(weatherWriter)
+  entries[weatherClass]=weatherWriter.toByteArray()
+  // The pinned 3.4.2 client CONSTRUCTS a KeyBinding on R. In Minecraft
+  // 1.21.1 the KeyBinding constructor itself registers the key in controls,
+  // so skipping only KeyBindingHelper.registerKeyBinding is NOT sufficient.
+  // Remove the exact key-construction sequence and bypass its old polling loop.
+  // The separate right-click item handler (RadioScreen) stays untouched.
+  def clientName='dev/whiteout/client/WhiteoutClient.class'
+  if(!entries.containsKey(clientName))throw new GradleException('Missing original WhiteoutClient')
+  def clientNode=new ClassNode()
+  new ClassReader(entries[clientName]).accept(clientNode,0)
+  int radioKeyRemoved=0, radioPollRemoved=0
+  clientNode.methods.each { m->
+   def instructions=m.instructions.toArray()
+   if(m.name=='onInitializeClient'){
+    for(int i=0;i<instructions.length;i++){
+     def ins=instructions[i]
+     if(ins instanceof LdcInsnNode && ins.cst=='key.whiteout.radio'){
+      int start=-1,stop=-1
+      for(int j=i-1;j>=Math.max(0,i-5);j--){
+       if(instructions[j] instanceof TypeInsnNode &&
+          instructions[j].opcode==Opcodes.NEW &&
+          instructions[j].desc=='net/minecraft/class_304'){start=j;break}
+      }
+      for(int j=i+1;j<Math.min(instructions.length,i+16);j++){
+       if(instructions[j] instanceof FieldInsnNode &&
+          instructions[j].opcode==Opcodes.PUTSTATIC &&
+          instructions[j].owner=='dev/whiteout/client/WhiteoutClient' &&
+          instructions[j].name=='radioKey'){stop=j;break}
+      }
+      if(start<0||stop<0)throw new GradleException('Base radio key construction changed')
+      def sequence=instructions[start..<stop]
+      if(sequence.any { it instanceof LabelNode || it instanceof FrameNode || it instanceof JumpInsnNode })
+       throw new GradleException('Unexpected control flow in radio key constructor')
+      // Before: new KeyBinding(... GLFW_KEY_R ...) + Fabric helper, then PUTSTATIC.
+      // After: null PUTSTATIC. Nothing is ever added to KEYS_BY_ID / KEY_TO_BINDINGS.
+      m.instructions.insertBefore(instructions[stop],new InsnNode(Opcodes.ACONST_NULL))
+      sequence.each { m.instructions.remove(it) }
+      radioKeyRemoved++
+      break
+     }
+    }
+   }
+   // Remove ALL original polling for the deleted radio key. Returning false
+   // from its condition leaves the following dialogue/hotkey logic unchanged.
+   for(int i=0;i<instructions.length-1;i++){
+    def field=instructions[i], call=instructions[i+1]
+    if(field instanceof FieldInsnNode && field.opcode==Opcodes.GETSTATIC &&
+       field.owner=='dev/whiteout/client/WhiteoutClient' && field.name=='radioKey' &&
+       call instanceof MethodInsnNode && call.opcode==Opcodes.INVOKEVIRTUAL &&
+       call.owner=='net/minecraft/class_304' && call.name=='method_1436'){
+      m.instructions.set(field,new InsnNode(Opcodes.ICONST_0))
+      m.instructions.remove(call)
+      radioPollRemoved++
+    }
+   }
+  }
+  if(radioKeyRemoved!=1||radioPollRemoved!=1)
+   throw new GradleException('Radio key signature mismatch: '+radioKeyRemoved+'/'+radioPollRemoved)
+  def clientWriter=new ClassWriter(ClassWriter.COMPUTE_MAXS)
+  clientNode.accept(clientWriter)
+  entries[clientName]=clientWriter.toByteArray()
+
+  metadata.version=project.version.toString()
+  metadata.name='Whiteout — Белая мгла'
+  if(!metadata.containsKey('mixins')||metadata.mixins==null)metadata.mixins=[]
+  if(!metadata.mixins.contains('whiteout-visual.mixins.json'))metadata.mixins.add('whiteout-visual.mixins.json')
+  if(!metadata.entrypoints.main.contains('dev.whiteout.power.PowerDevices'))metadata.entrypoints.main.add('dev.whiteout.power.PowerDevices')
+  if(!metadata.entrypoints.client.contains('dev.whiteout.power.PowerClient'))metadata.entrypoints.client.add('dev.whiteout.power.PowerClient')
+  // These addon entrypoints are absent from the pinned Whiteout 3.4.2 base.
+  // Register them explicitly: the release assembler otherwise ignores the overlay's fabric.mod.json.
+  for(String ep : ['dev.whiteout.power.bolt.DoorBolts','dev.whiteout.power.barricade.Barricades']) {
+   if(!metadata.entrypoints.main.contains(ep))metadata.entrypoints.main.add(ep)
+  }
+  if(!metadata.entrypoints.client.contains('dev.whiteout.power.bolt.DoorBoltClient'))metadata.entrypoints.client.add('dev.whiteout.power.bolt.DoorBoltClient')
+  if(!entries.containsKey('whiteout-visual.mixins.json'))throw new GradleException('Missing Whiteout visual theme mixin')
+  if(!entries.containsKey('whiteout-visual-refmap.json'))throw new GradleException('Missing visual theme Mixin refmap; check Loom')
+  if(!entries.containsKey('dev/whiteout/power/StoryDialogueHud.class')||!entries.containsKey('dev/whiteout/power/StoryPortraits.class'))throw new GradleException('Missing story HUD and portrait classes in merged JAR')
+  for(String asset : ['assets/whiteout/blockstates/old_generator.json',
+                      'assets/whiteout/blockstates/emergency_lamp.json',
+                      'assets/whiteout/blockstates/rime_glass_pane.json',
+                      'dev/whiteout/power/BackupLampEntity.class',
+                      'dev/whiteout/power/UnstableFusePolicy.class',
+                      'dev/whiteout/power/WorldAtmosphere.class',
+                      'assets/whiteout/blockstates/frost_window.json',
+                      'assets/whiteout/blockstates/wall_thermometer.json']) {
+   if(!entries.containsKey(asset))throw new GradleException('Missing 3.9.0 object: '+asset)
+  }
+  for(int track=1;track<=7;track++){
+   if(!entries.containsKey('assets/whiteout/sounds/music_slot_'+track+'.ogg'))
+    throw new GradleException('Missing bundled soundtrack '+track)
+  }
+  if(entries.keySet().any { it.matches('assets/whiteout/sounds/music_slot_(8|9|1[0-6])\\.ogg') })
+   throw new GradleException('An old placeholder audio file survived')
+  if(!entries.containsKey('dev/whiteout/MusicCatalog.class')||
+     !entries.containsKey('dev/whiteout/client/MusicLibraryScreen.class')||
+     !entries.containsKey('dev/whiteout/client/CustomMusicManager.class'))
+   throw new GradleException('Music overrides missing from full JAR')
+  entries['fabric.mod.json']=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(metadata)).getBytes('UTF-8')
+  def out=output.get().asFile;out.parentFile.mkdirs()
+  def zip=new java.util.zip.ZipOutputStream(new FileOutputStream(out))
+  try {entries.each {name,bytes->def entry=new java.util.zip.ZipEntry(name);entry.time=0;zip.putNextEntry(entry);zip.write(bytes);zip.closeEntry()}} finally {zip.close()}
+  println('Whiteout release: '+out)
+ }
+}
+
+// Normal gameplay screens must use the no-blur base. Mixin classes are a
+// special case: their superclass must match the target screen's superclass,
+// so ZoneOldShelterMixin cannot extend SharpScreen without breaking Mixin.
+tasks.register('verifySharpScreens') {
+ doLast {
+  fileTree('src/main/java/dev/whiteout/power').matching { include '**/*.java' }.each { source ->
+   def javaText = source.getText('UTF-8')
+   def directlyExtendsScreen = (javaText =~ /\bextends\s+Screen\b/).find()
+   def screenMixin = source.parentFile.name == 'mixin' && (javaText =~ /@Mixin\s*\(/).find()
+   if (source.name != 'SharpScreen.java' && directlyExtendsScreen && !screenMixin) {
+    throw new GradleException("Use SharpScreen for gameplay GUI: " + source.name)
+   }
+  }
+ }
+}
+tasks.named('compileJava') { dependsOn 'verifySharpScreens' }
+
+// A normal build must produce the complete mod, not only the overlay JAR.
+tasks.named('build') { dependsOn 'assembleWhiteout' }
+
+// All executable regressions use the actual compiled production classes.
+def regressions = ['WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewFeaturesTest',
+ 'GridStatePolicyTest','ForestCandidatePolicyTest','AuditRegressionTest','BuildingAtmosphereTest',
+ 'BackupLampPolicyTest','MultiNetworkRulesTest','SnapshotChunksTest','ZoneFolderOrderTest',
+ 'ZoneIdBatcherTest','ZoneMusicContinuityTest','GeneratorLifecycleTest','DiagnosticDataTest','LegacyPersistenceTest','GeneratorMeshTest','AuditHardeningTest','StoreSafetyTest','BackpackPolicyTest','BackpackSyncTest','BackpackModelTest','WeatherDepthTimingTest']
+tasks.register('compileRegressionTests', JavaCompile) {
+ dependsOn 'classes'
+ source regressions.collect { 'tests/'+it+'.java' }
+ classpath=sourceSets.main.compileClasspath + sourceSets.main.output
+ destinationDirectory=layout.buildDirectory.dir('regression-tests')
+ javaCompiler=javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }
+}
+regressions.each { testName ->
+ tasks.register('regression'+testName, JavaExec) {
+  dependsOn 'compileRegressionTests'
+  classpath=files(layout.buildDirectory.dir('regression-tests')) + sourceSets.main.output + sourceSets.main.compileClasspath
+  mainClass=testName
+  javaLauncher=javaToolchains.launcherFor { languageVersion=JavaLanguageVersion.of(21) }
+ }
+ tasks.named('check') { dependsOn 'regression'+testName }
+}

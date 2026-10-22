@@ -1,0 +1,8 @@
+Whiteout 3.12.7 — source integration
+
+Base: 3.12.6 sources.
+Add: editor Undo, zone settings copy, ground snow, door bolts, barricades.
+Preserve: automatic door closing, wind movement, prior weather depth hotfix.
+Fix: door Block import; merge resources, manifests and final JAR assembler entrypoints.
+Gradle/Minecraft compilation not verified in this environment.
+Details: docs/3.12.7-MERGE-CHECKLIST.md.
