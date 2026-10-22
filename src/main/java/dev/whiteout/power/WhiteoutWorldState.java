@@ -56,7 +56,8 @@ public final class WhiteoutWorldState {
  }
 
  private static final Map<MinecraftServer,WhiteoutWorldState> INSTANCES=new IdentityHashMap<>();
- private final MinecraftServer server;
+ private MinecraftServer server;
+ private static boolean registered;
  private boolean closed;
  private final WorldStateCache<String,Reading<PowerNetworkStateView>> networks=new WorldStateCache<>(128,1);
  private record ShelterKey(String dimension,Vec3d eye){}
@@ -69,9 +70,11 @@ public final class WhiteoutWorldState {
  }
  /** Called once by PowerDevices; callbacks invalidate only, never read chunks. */
  static void register(){
+  if(registered)return;
+  registered=true;
   ServerLifecycleEvents.SERVER_STOPPED.register(server->{
    WhiteoutWorldState view=INSTANCES.remove(server);
-   if(view!=null){view.closed=true;view.networks.clear();view.shelters.clear();}
+   if(view!=null)view.close();
   });
   ServerChunkEvents.CHUNK_LOAD.register((world,chunk)->invalidate(world.getServer()));
   ServerChunkEvents.CHUNK_UNLOAD.register((world,chunk)->invalidate(world.getServer()));
@@ -79,6 +82,7 @@ public final class WhiteoutWorldState {
    if(world instanceof ServerWorld sw)invalidate(sw.getServer());
   });
  }
+ private void close(){closed=true;networks.clear();shelters.clear();server=null;}
  /** Existing owner hooks call this after changes. Does not instantiate a facade. */
  static void invalidate(MinecraftServer server){
   WhiteoutWorldState view=INSTANCES.get(server);
@@ -88,7 +92,7 @@ public final class WhiteoutWorldState {
   WhiteoutWorldState view=INSTANCES.get(server);if(view!=null)view.networks.clear();
  }
  private long tick(){
-  if(closed||!server.isOnThread())throw new IllegalStateException("WorldState is closed or off the server thread");
+  if(closed||server==null||server.isStopped()||!server.isOnThread())throw new IllegalStateException("WorldState is closed or off the server thread");
   return Integer.toUnsignedLong(server.getTicks());
  }
  private void world(ServerWorld world){
@@ -166,7 +170,12 @@ public final class WhiteoutWorldState {
    fuseKnown,genKnown,inserted,burnt,running,fueled,c.burntPending,c.generatorStopPending)&&!flickering;
   List<FixtureStateView> fixtures=c.lamps.stream().map(x->new FixtureStateView(
    new Address(x.dimension,x.x,x.y,x.z),x.original)).toList();
-  return new Reading<>(genCached||fuseCached?Availability.CACHED:Availability.AVAILABLE,tick,
+  Availability status=c.configurationError!=null?Availability.UNAVAILABLE:
+   generator.availability()==Availability.UNBOUND||fuse.availability()==Availability.UNBOUND?Availability.UNBOUND:
+   generator.availability()==Availability.MISSING||fuse.availability()==Availability.MISSING?Availability.MISSING:
+   generator.availability()==Availability.UNAVAILABLE||fuse.availability()==Availability.UNAVAILABLE?Availability.UNAVAILABLE:
+   genCached||fuseCached||generator.availability()==Availability.CACHED||fuse.availability()==Availability.CACHED?Availability.CACHED:Availability.AVAILABLE;
+  return new Reading<>(status,tick,
    Optional.of(new PowerNetworkStateView(id,power,c.burntPending,c.generatorStopPending,flickering,generator,fuse,fixtures)));
  }
  public Reading<DoorStateView> door(ServerWorld world,BlockPos target){
