@@ -1,0 +1,85 @@
+name: Export Whiteout 3.12.11 personal sources
+
+on:
+  push:
+    branches:
+      - export/whiteout-3.12.11-personal-zip
+
+permissions:
+  contents: read
+
+jobs:
+  create-personal-source-zip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact Codex sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Make full source zip with private soundtrack
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import subprocess
+          import zipfile
+
+          root = pathlib.Path.cwd()
+          release = root / "Whiteout-3.12.9-1.21.1.jar"
+          destination = root / "Whiteout-3.12.11-Full-Sources-Personal.zip"
+          if not release.is_file():
+              raise SystemExit(f"Missing original personal JAR: {release}")
+
+          sounds = {}
+          with zipfile.ZipFile(release, "r") as jar:
+              for track in range(1, 8):
+                  source = f"assets/whiteout/sounds/music_slot_{track}.ogg"
+                  target = "src/main/resources/" + source
+                  try:
+                      audio = jar.read(source)
+                  except KeyError:
+                      raise SystemExit(f"Missing personal recording: {source}")
+                  if not audio.startswith(b"OggS"):
+                      raise SystemExit(f"Invalid OGG recording: {source}")
+                  sounds[target] = audio
+
+          names = subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")
+          tracked = [
+              x for x in names if x and
+              x != release.name and
+              x != destination.name and
+              not x.startswith(".github/workflows/")
+          ]
+          with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+              for name in tracked:
+                  file = root / name
+                  if not file.is_file():
+                      raise SystemExit(f"Missing tracked source: {name}")
+                  archive.write(file, name)
+              for name, payload in sorted(sounds.items()):
+                  archive.writestr(name, payload)
+          with zipfile.ZipFile(destination) as verified:
+              assert verified.testzip() is None
+              for needed in (
+                  "gradlew.bat",
+                  "build.gradle",
+                  "base/Whiteout-3.4.2-1.21.1.jar",
+                  "src/main/java/dev/whiteout/power/WhiteoutWorldState.java",
+                  "src/main/java/dev/whiteout/power/WorldStateCache.java",
+              ):
+                  assert needed in verified.namelist(), needed
+              for name, data in sounds.items():
+                  assert verified.read(name) == data, name
+          print(f"Prepared {destination.name}: {destination.stat().st_size} bytes, {len(tracked)} tracked files, {len(sounds)} personal OGG tracks")
+          PY
+
+      - name: Upload downloadable source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Whiteout-3.12.11-Full-Sources-Personal
+          path: Whiteout-3.12.11-Full-Sources-Personal.zip
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
