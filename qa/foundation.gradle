@@ -3,13 +3,35 @@ gradle.projectsEvaluated {
  def p=gradle.rootProject
  p.tasks.register('compileFoundationTests', JavaCompile) {
   dependsOn p.tasks.named('classes')
-  source p.fileTree('tests') { include 'BarricadeCollisionTest.java'; include 'BarricadeSupportTest.java'; include 'WorldState*Test.java' }
-  classpath=p.sourceSets.main.compileClasspath+p.sourceSets.main.output
+  source p.fileTree('tests') { include 'BarricadeCollisionTest.java'; include 'BarricadeSupportTest.java'; include 'WorldState*Test.java'; include 'FoundationBootstrap.java' }
+  // Overlay classes must precede the older binary base when compiling tests.
+  classpath=p.sourceSets.main.output+p.sourceSets.main.compileClasspath
   destinationDirectory=p.layout.buildDirectory.dir('foundation-tests')
   javaCompiler=p.javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }
  }
- p.tasks.register('foundationTests')
- ['dev.whiteout.power.barricade.BarricadeCollisionTest','dev.whiteout.power.barricade.BarricadeSupportTest'].each { name ->
+ p.tasks.register('foundationTests') { dependsOn 'foundationFabricBootstrap' }
+ // The released mod overlays duplicate base classes. Reproduce class precedence with
+ // an unpacked test fixture, without building/remapping a release JAR or modifying the base.
+ def testBase=p.layout.buildDirectory.dir('foundation-base')
+ p.tasks.register('prepareFoundationBase',Sync) {
+  dependsOn p.tasks.named('classes')
+  from { p.zipTree(p.sourceSets.main.compileClasspath.files.find { it.name.startsWith('Whiteout-3.4.2') }) }
+  into testBase
+  exclude { details -> details.path.endsWith('.class') && p.sourceSets.main.output.classesDirs.files.any { new File(it,details.path).isFile() } }
+ }
+ p.tasks.register('foundationFabricBootstrap',JavaExec) {
+  dependsOn 'compileFoundationTests','prepareFoundationBase'
+  classpath=p.files(p.layout.buildDirectory.dir('foundation-tests'))+p.sourceSets.main.output+
+   p.sourceSets.main.compileClasspath.filter { !it.name.startsWith('Whiteout-3.4.2') }+p.files(testBase)+p.configurations.mappingsFinal
+  mainClass='FoundationBootstrap'
+  systemProperty 'fabric.development','true'
+  systemProperty 'fabric.gameMappingNamespace','named'
+  javaLauncher=p.javaToolchains.launcherFor { languageVersion=JavaLanguageVersion.of(21) }
+  doFirst { workingDir=p.layout.buildDirectory.dir('foundation-runtime').get().asFile;workingDir.mkdirs() }
+ }
+ p.tasks.register('foundationBarricadeCollisionTest') { dependsOn 'foundationFabricBootstrap' }
+ ['dev.whiteout.power.barricade.BarricadeSupportTest',
+  'dev.whiteout.power.WorldStateCacheTest','dev.whiteout.power.WorldStateSnapshotTest'].each { name ->
   def taskName='foundation'+name.tokenize('.').last()
   p.tasks.register(taskName,JavaExec) {
    dependsOn 'compileFoundationTests'
@@ -17,8 +39,6 @@ gradle.projectsEvaluated {
    mainClass=name
    javaLauncher=p.javaToolchains.launcherFor { languageVersion=JavaLanguageVersion.of(21) }
   }
-  // The Minecraft bootstrap probe requires Fabric runtime access transformations.
-  // Keep it explicitly invokable; standalone policy tests do not launch Minecraft.
-  if(!name.endsWith('BarricadeCollisionTest'))p.tasks.named('foundationTests') { dependsOn taskName }
+  p.tasks.named('foundationTests') { dependsOn taskName }
  }
 }

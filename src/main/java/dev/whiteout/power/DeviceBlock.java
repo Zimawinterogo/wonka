@@ -52,6 +52,7 @@ public final class DeviceBlock extends BlockWithEntity {
  @Override protected void onStateReplaced(BlockState state,World w,BlockPos p,BlockState next,boolean moved){
   if(!state.isOf(next.getBlock()) && w.getBlockEntity(p) instanceof DeviceEntity e)e.dropContents();
   super.onStateReplaced(state,w,p,next,moved);
+  if(!state.isOf(next.getBlock())&&w instanceof net.minecraft.server.world.ServerWorld sw)WhiteoutWorldState.invalidatePower(sw.getServer());
  }
  @Override protected boolean emitsRedstonePower(BlockState s){return kind==1;}
  @Override protected int getWeakRedstonePower(BlockState s,BlockView w,BlockPos p,Direction d){return kind==1&&s.get(ACTIVE)?15:0;}

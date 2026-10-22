@@ -43,6 +43,7 @@ public final class WorldAtmosphere {
  private static int ticks;
  public static final int DOOR_FREEZE_TICKS = 1600;
  private WorldAtmosphere(){}
+ static boolean worldStateAvailable(MinecraftServer server){get(server);return !INVALID.contains(server);}
  public static AtmosphereConfig get(MinecraftServer server){return SETTINGS.computeIfAbsent(server,WorldAtmosphere::load);}
  public static com.google.gson.JsonObject editorSnapshot(MinecraftServer s,String id){
   AtmosphereConfig c=get(s);var o=new com.google.gson.JsonObject();

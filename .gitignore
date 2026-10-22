@@ -4,6 +4,7 @@ build/
 .vscode/
 *.iml
 *.log
+logs/
 __pycache__/
 *.pyc
 .DS_Store

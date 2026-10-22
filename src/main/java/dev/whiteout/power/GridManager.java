@@ -218,6 +218,16 @@ public final class GridManager {
    return disabled;
   }
  }
+ // Read-only views never invoke lazy loaders (which may create corrupt-file backups).
+ static Config worldStateConfig(MinecraftServer server,String id){
+  if(MAIN.equals(id))return CONFIGS.get(server);
+  NetworkStore store=NETWORKS.get(server);
+  return store==null||store.error!=null?null:store.grids.get(id);
+ }
+ static boolean worldStateAvailable(MinecraftServer server,String id){
+  if(MAIN.equals(id))return CONFIGS.containsKey(server);
+  NetworkStore store=NETWORKS.get(server);return store!=null&&store.error==null;
+ }
  private static Config get(MinecraftServer s){return CONFIGS.computeIfAbsent(s,GridManager::load);}
  private static Path path(MinecraftServer s){return s.getSavePath(WorldSavePath.ROOT).resolve("whiteout-grid.json");}
  private static Path networkPath(MinecraftServer s){return s.getSavePath(WorldSavePath.ROOT).resolve(NETWORK_FILE);}
@@ -295,6 +305,7 @@ public final class GridManager {
   }catch(Exception ex){System.err.println("[Whiteout] Cannot save additional circuits: "+ex);return false;}
  }
  private static void persist(MinecraftServer server,Config c){
+  WhiteoutWorldState.invalidatePower(server);
   if(c==get(server))save(server,c);
   else{NetworkStore ns=networks(server);if(ns.grids.containsValue(c))saveNetworks(server,ns);
    else System.err.println("[Whiteout] Refusing to save an unregistered circuit");}
@@ -595,7 +606,7 @@ public final class GridManager {
     String circuitId=networkId(server,c);
     for(Fixture f:c.lamps){ServerWorld fw=world(server,f.dimension);if(fw!=null)apply(fw,f,want,PowerSwitches.allows(server,circuitId,address(f.dimension,f.pos())));}
    }
-  }finally{c.reconciling=false;}
+  }finally{c.reconciling=false;WhiteoutWorldState.invalidatePower(server);}
  }
  private static void apply(ServerWorld w,Fixture f,boolean mains,boolean enabled){
   boolean power=mains&&enabled;

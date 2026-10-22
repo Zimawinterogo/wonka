@@ -1,4 +1,22 @@
-# Whiteout 3.12.9 — Minecraft 1.21.1 / Fabric / Java 21
+# Whiteout 3.12.11 — Minecraft 1.21.1 / Fabric / Java 21
+
+Синхронизированы физические формы соединённых баррикад; добавлен серверный
+read-only `WhiteoutWorldState` с immutable snapshots и ограниченным кешированием.
+
+- [Архитектурный аудит](docs/WINTER_CRISIS_ARCHITECTURE.md)
+- [Исправление баррикад](docs/3.12.10-COLLISIONS.md)
+- [WorldState, выполненные тесты и ограничения](docs/3.12.11-WORLDSTATE.md)
+
+Проверка без сборки релизного JAR: `CHECK_3.12.11.bat` или
+`./gradlew --no-daemon -I qa/foundation.gradle check foundationTests`.
+Накопленный холод в старой механике живёт на клиенте и в серверном API обозначен
+как недоступный. Live-world, dedicated server с финальным JAR и Iris/BSL ещё
+требуют проверки. Полный JAR версии 3.12.11 не создавался; корневой JAR 3.12.9 —
+существовавший файл предыдущей версии.
+
+---
+
+# Whiteout 3.12.9 — исторические сведения
 
 Исправлены визуальные соединения баррикад и геометрия позёмки.
 Подробности, ограничения и тесты: [docs/3.12.9-VISUAL-FIXES.md](docs/3.12.9-VISUAL-FIXES.md).

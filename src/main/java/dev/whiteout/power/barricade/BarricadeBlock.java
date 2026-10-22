@@ -21,9 +21,8 @@ import net.minecraft.util.math.random.Random;
 /**
  * One cell of boards nailed over an opening. Every cell is an independent block: it drops exactly one
  * item and never owns hidden data, so nothing can duplicate or leave an invisible obstacle.
- * PART is purely visual (which slice of a 1x1 / 1x2 layout) and is repaired by neighbour updates.
- * To add other opening sizes: extend Part (e.g. LEFT/RIGHT), add layouts in the generator script and
- * a new OpeningShape in BarricadePlanner. Nothing else changes.
+ * PART/VARIANT remain saved for legacy compatibility and partner repair. Connected rendering and
+ * collision use world-height parity and immediate neighbours, without new saved properties.
  */
 public final class BarricadeBlock extends Block {
  public enum Part implements StringIdentifiable {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cosmetic, SOUTH-authored connected tiles. Leaves legacy physics/assets untouched.
+"""SOUTH-authored connected tiles and matching wood collision table.
 
 Run from anywhere with Python 3 (standard library only). A single periodic strip
 is clipped, never scaled, into cells. Mask bits: left=1, right=2, down=4, up=8.

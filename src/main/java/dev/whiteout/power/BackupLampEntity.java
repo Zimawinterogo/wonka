@@ -33,6 +33,9 @@ public final class BackupLampEntity extends BlockEntity {
  }
  public void unlink(){linked=false;gridPowered=false;markDirty();updateLight();}
  public int charge(){return charge;}
+ boolean worldStateLinked(){return linked;}
+ boolean worldStateMains(){return gridPowered;}
+ boolean worldStateSwitch(){return switchEnabled;}
  /** Translation key for the server-side battery state; display only, no state changes. */
  public String statusTranslationKey(){
   if(!linked)return "message.whiteout.backup_lamp.unlinked";

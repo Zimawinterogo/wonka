@@ -64,6 +64,11 @@ public final class PowerSwitches {
   return existing;
  }
  /** If several switches control one lamp, any ON switch permits it. */
+ static boolean worldStateAvailable(MinecraftServer server){return !data(server).invalid;}
+ static WhiteoutWorldState.SwitchStateView worldState(net.minecraft.server.world.ServerWorld world,BlockPos pos){
+  Entry e=lookup(world,pos,false);
+  return e==null?null:new WhiteoutWorldState.SwitchStateView(e.network,e.on,e.all,List.copyOf(e.lamps));
+ }
  public static Map<String,String> diagnosticBindings(MinecraftServer server){
   Map<String,String> result=new LinkedHashMap<>();
   data(server).switches.forEach((key,value)->result.put(key,value.network));

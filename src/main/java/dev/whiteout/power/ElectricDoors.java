@@ -58,6 +58,10 @@ public final class ElectricDoors {
   try{GridFileIO.writeAtomic(file(server),GSON.toJson(d));return true;}
   catch(Exception ex){System.err.println("[Whiteout] Could not save electric doors: "+ex);return false;}
  }
+ static boolean worldStateAvailable(MinecraftServer server){return !data(server).invalid;}
+ static String worldStateBinding(ServerWorld world,BlockPos lower){
+  return supported(world.getBlockState(lower))?data(world.getServer()).doors.get(key(world,lower)):null;
+ }
  public static Map<String,String> diagnosticBindings(MinecraftServer server){return Map.copyOf(data(server).doors);}
  /** A door remains excluded from automatic closing while it is bound to Whiteout power,
   * even when that grid is currently switched on. */

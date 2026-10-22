@@ -3,7 +3,7 @@ import org.objectweb.asm.tree.*
 
 plugins { id 'fabric-loom' version '1.8.13' }
 loom { mixin { defaultRefmapName = 'whiteout-visual-refmap.json' } }
-version = '3.12.10'
+version = '3.12.11'
 group = 'dev.whiteout'
 base { archivesName = 'whiteout-power' }
 repositories { mavenCentral() }
