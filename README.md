@@ -1,9 +1,11 @@
-# Whiteout 3.12.13 — Minecraft 1.21.1 / Fabric / Java 21
+# Whiteout 3.12.14 — Minecraft 1.21.1 / Fabric / Java 21
 
 Синхронизированы физические формы соединённых баррикад; добавлен серверный
 read-only `WhiteoutWorldState` с immutable snapshots и ограниченным кешированием.
 Добавлены трёхзначные условия и отключённый по умолчанию Winter Crisis Director.
 Единственный сценарий — ручная диагностика без изменения игрового мира.
+Интегрированы настройки аварийного света по сложности и оптимизации дверей:
+[обзор изменений архива и совместимость](docs/3.12.14-ARCHIVE-INTEGRATION.md).
 
 - [Архитектурный аудит](docs/WINTER_CRISIS_ARCHITECTURE.md)
 - [Исправление баррикад](docs/3.12.10-COLLISIONS.md)
@@ -16,7 +18,7 @@ read-only `WhiteoutWorldState` с immutable snapshots и ограниченны�
 `./gradlew --no-daemon -I qa/foundation.gradle compileJava check foundationTests`.
 Накопленный холод в старой механике живёт на клиенте и в серверном API обозначен
 как недоступный. Live-world, dedicated server с финальным JAR и Iris/BSL ещё
-требуют проверки. Полный JAR версии 3.12.13 не создавался; корневой JAR 3.12.9 —
+требуют проверки. Полный JAR версии 3.12.14 не создавался; корневой JAR 3.12.9 —
 существовавший файл предыдущей версии.
 
 ---

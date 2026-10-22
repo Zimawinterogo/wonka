@@ -39,6 +39,22 @@ public final class WorldStateDeviceTest {
   ok(WhiteoutWorldState.emergencyLightSnapshot(reloaded).equals(light),"lamp NBT reload");
   reloaded.readNbt(new NbtCompound(),DynamicRegistryManager.EMPTY);
   ok(WhiteoutWorldState.emergencyLightSnapshot(reloaded).chargeTicks()==BackupLampEntity.MAX_CHARGE,"legacy lamp defaults retained");
+  saved.putInt("BackupCharge",3700);saved.putInt("BackupChargeScale",10000);
+  saved.putInt("BackupProgressRemainder",6000);saved.putInt("BackupProgressDuration",18000);
+  lamp.readNbt(saved,DynamicRegistryManager.EMPTY);
+  ok(lamp.charge()==4440,"foreign normalized scale preserves 37 percent");
+  lamp.setGridPower(false,true);lamp.setGridPower(false,false);
+  NbtCompound fractional=new NbtCompound();lamp.writeNbt(fractional,DynamicRegistryManager.EMPTY);
+  ok(fractional.getInt("BackupProgressRemainder")==6000,"switch toggles preserve fractional progress");
+  reloaded.readNbt(fractional,DynamicRegistryManager.EMPTY);
+  NbtCompound restored=new NbtCompound();reloaded.writeNbt(restored,DynamicRegistryManager.EMPTY);
+  ok(restored.equals(fractional),"fractional NBT roundtrip");
+  var empty=new DoorGateSync.Snapshot("minecraft:overworld","");
+  var blocked=new DoorGateSync.Snapshot("minecraft:overworld","1,2,3");
+  ok(!DoorGateSync.shouldSend(empty,empty,10),"identical door packet suppressed");
+  ok(DoorGateSync.shouldSend(empty,blocked,10)&&DoorGateSync.shouldSend(blocked,empty,10),"lock and unlock sent immediately");
+  ok(DoorGateSync.shouldSend(empty,new DoorGateSync.Snapshot("minecraft:the_nether",""),10),"dimension change sent");
+  ok(DoorGateSync.shouldSend(empty,empty,100)&&DoorGateSync.shouldSend(null,empty,0),"heartbeat and reconnect snapshot");
   System.out.println("WorldStateDeviceTest PASS: "+checks);
  }
 }

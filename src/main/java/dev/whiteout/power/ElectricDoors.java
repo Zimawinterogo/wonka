@@ -105,27 +105,34 @@ public final class ElectricDoors {
    world.setBlockState(upperPos,top.with(Properties.OPEN,false),Block.NOTIFY_ALL);
  }
  private static void tick(ServerWorld world){
+  // Bound the safety sweep for externally opened doors; interaction checks stay live.
+  if(Math.floorMod(world.getTime(),10L)!=0L)return;
   String dimension=world.getRegistryKey().getValue().toString()+":";
+  Map<String,Boolean> powerByNetwork=new HashMap<>();
   for(var entry:data(world.getServer()).doors.entrySet()){
    String address=entry.getKey();if(!address.startsWith(dimension))continue;
    String coords=address.substring(dimension.length());String[] xyz=coords.split(":");if(xyz.length!=3)continue;
    try{
     BlockPos p=new BlockPos(Integer.parseInt(xyz[0]),Integer.parseInt(xyz[1]),Integer.parseInt(xyz[2]));
-    if(world.isChunkLoaded(p)&&!GridManager.networkPowered(world.getServer(),entry.getValue()))close(world,p);
+    if(!world.isChunkLoaded(p))continue;
+    boolean powered=powerByNetwork.computeIfAbsent(entry.getValue(),id->GridManager.networkPowered(world.getServer(),id));
+    if(!powered)close(world,p);
    }catch(NumberFormatException ignored){}
   }
  }
  /** Only loaded doors near a player are sent to that client. */
  public static List<BlockPos> nearbyLocked(ServerWorld world,BlockPos around,int radius){
   List<BlockPos> result=new ArrayList<>();
+  Map<String,Boolean> powerByNetwork=new HashMap<>();
   String prefix=world.getRegistryKey().getValue().toString()+":";
   for(var entry:data(world.getServer()).doors.entrySet()){
-   if(!entry.getKey().startsWith(prefix)||GridManager.networkPowered(world.getServer(),entry.getValue()))continue;
+   if(!entry.getKey().startsWith(prefix))continue;
    String[] xyz=entry.getKey().substring(prefix.length()).split(":");
    if(xyz.length!=3)continue;
    try{
     BlockPos p=new BlockPos(Integer.parseInt(xyz[0]),Integer.parseInt(xyz[1]),Integer.parseInt(xyz[2]));
-    if(p.isWithinDistance(around.toCenterPos(),radius)&&world.isChunkLoaded(p)&&supported(world.getBlockState(p)))result.add(p);
+    if(p.isWithinDistance(around.toCenterPos(),radius)&&world.isChunkLoaded(p)&&supported(world.getBlockState(p))
+      &&!powerByNetwork.computeIfAbsent(entry.getValue(),id->GridManager.networkPowered(world.getServer(),id)))result.add(p);
    }catch(NumberFormatException ignored){}
   }
   return result;

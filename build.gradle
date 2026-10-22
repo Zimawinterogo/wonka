@@ -3,7 +3,7 @@ import org.objectweb.asm.tree.*
 
 plugins { id 'fabric-loom' version '1.8.13' }
 loom { mixin { defaultRefmapName = 'whiteout-visual-refmap.json' } }
-version = '3.12.13'
+version = '3.12.14'
 group = 'dev.whiteout'
 base { archivesName = 'whiteout-power' }
 repositories { mavenCentral() }
@@ -564,7 +564,7 @@ def regressions = ['WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewF
 tasks.register('compileRegressionTests', JavaCompile) {
  dependsOn 'classes'
  source regressions.collect { 'tests/'+it+'.java' }
- classpath=sourceSets.main.compileClasspath + sourceSets.main.output
+ classpath=sourceSets.main.output + sourceSets.main.compileClasspath
  destinationDirectory=layout.buildDirectory.dir('regression-tests')
  javaCompiler=javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }
 }
