@@ -146,7 +146,7 @@ public final class LakeStory {
    state.homePulls=Math.min(3,state.homePulls+1);
    if(LakeStoryPolicy.afterPull(state.stage,true,state.homePulls)==4){
     state.homeAttempted=true;next(((ServerWorld)device.getWorld()).getServer(),state,4);
-    speak(((ServerWorld)device.getWorld()).getServer(),"Мда блять");
+    speak(((ServerWorld)device.getWorld()).getServer(),LakeDialogueLines.FAILED_START);
    }else save(((ServerWorld)device.getWorld()).getServer(),state);
   }
   return true;
@@ -241,7 +241,9 @@ public final class LakeStory {
    if(!state.journal.apply(world,"glass")){conflict(server,state,"Window replaced after snapshot; finale paused");return;}
    world.getChunkManager().save(true);
    state.finalPhase=2;state.finalSoundAt=world.getTime()+35;save(server,state);
-   world.playSound(null,SOUND_ORIGIN,SoundEvents.BLOCK_GLASS_BREAK,SoundCategory.BLOCKS,4f,.85f);
+   // Two powerful, spatially accurate breaks at the upper windows.
+   world.playSound(null,SOUND_ORIGIN,SoundEvents.BLOCK_GLASS_BREAK,SoundCategory.BLOCKS,8f,.80f);
+   world.playSound(null,SOUND_ORIGIN.up(),SoundEvents.BLOCK_GLASS_BREAK,SoundCategory.BLOCKS,7f,1.13f);
    for(var change:state.journal.changes)if(change.group.equals("glass")){
     BlockPos pos=change.pos();
     world.spawnParticles(new net.minecraft.particle.BlockStateParticleEffect(net.minecraft.particle.ParticleTypes.BLOCK,change.before.state()),
@@ -251,7 +253,7 @@ public final class LakeStory {
   }
   if(state.finalPhase==2&&world.getTime()>=state.finalSoundAt){
    state.finalPhase=3;next(server,state,11);
-   speak(server,"Там что-то наверху, мне надо проверить. может рыбаку нужна помощь?");clear(server);
+   speak(server,LakeDialogueLines.GLASS_FINALE);clear(server);
   }
  }
  private static void tick(MinecraftServer server,State state){
@@ -286,7 +288,7 @@ public final class LakeStory {
     }
     boolean entered=state.inside.add(id);
     if(entered&&!state.waitingExit.contains(id)){
-     next(server,state,1);speak(server,"Холодно блять, зайду чтоль к рыбаку, узнаю че да как у него");return;
+     next(server,state,1);speak(server,LakeDialogueLines.ARRIVAL);return;
     }
    }
    if(state.stage==1&&at(player,DOOR)&&lookingAt(player,DOOR,true)){
@@ -296,7 +298,7 @@ public final class LakeStory {
     enterLockedDoor(server,state);return;
    }
    if(state.stage==2&&close(player,HOME_GEN,4)){
-    next(server,state,3);speak(server,"Ну что за напасть ебаная, ладно может все не так плохо");return;
+    next(server,state,3);speak(server,LakeDialogueLines.FOUND_GENERATOR);return;
    }
    if(LakeStoryPolicy.afterPanel(state.stage,state.homeAttempted)==5&&at(player,HOME_PANEL)&&lookingAt(player,HOME_PANEL,false)){
     used(player,world,HOME_PANEL);return;
@@ -304,23 +306,24 @@ public final class LakeStory {
    if(state.stage==5&&close(player,MILL_ENTRY,4)){
     next(server,state,6);
     world.playSound(null,new BlockPos(8378,73,8420),PowerDevices.OLD_CREAK,SoundCategory.BLOCKS,.8f,.83f);
-    speak(server,"Что...");goal(server,"Восстановить электроснабжение");return;
+    speak(server,LakeDialogueLines.SAWMILL_ARRIVAL);goal(server,"Восстановить электроснабжение");return;
    }
-   if(state.stage==6&&at(player,MILL_PANEL)&&lookingAt(player,MILL_PANEL,false)){
-    next(server,state,8);speak(server,"Ага, теперь ясно, надо включить резервный источник питания, и все должно заработать, осталось только его найти, блять");return;
+   if(state.stage==6&&LakeStoryPolicy.inBrickRoom(player.getX(),player.getY(),player.getZ())){
+    // The player's feet must be inside the mapped brick room; no panel click needed.
+    next(server,state,8);speak(server,LakeDialogueLines.BRICK_ROOM);return;
    }
    if(state.stage==8){
     DeviceEntity gen=device(world,RESERVE);
     if(gen!=null&&gen.active()&&GridManager.lakeReserveBound(server)&&GridManager.networkPowered(server,"circuit_3")){
      next(server,state,9);ageHouse(server,state,world);
-     speak(server,"Заебись");goal(server,"Вернуться к дому");return;
+     speak(server,LakeDialogueLines.RESERVE_STARTED);goal(server,"Вернуться к дому");return;
     }
    }
    if(state.stage==9&&close(player,DOOR,4)&&player.getBlockPos().getZ()>DOOR.getZ()){
     // Only progress after the player is inside the cabin, not from a nearby yard.
     if(player.getX()>8407&&player.getX()<8417&&player.getZ()>8383&&player.getZ()<8393&&player.getY()>71&&player.getY()<76){
      state.finalSoundAt=world.getTime()+150;next(server,state,10);
-     speak(server,"Какого хуя тут все гнилое?? я же вчера заходил к нему,, все нормально было..");
+     speak(server,LakeDialogueLines.DECAYED_HOUSE);
      clear(server);return;
     }
    }
@@ -329,7 +332,7 @@ public final class LakeStory {
  private static void enterLockedDoor(MinecraftServer server,State state){
   if(state.stage!=1)return;
   next(server,state,2);
-  speak(server,"Че за хуйня? у него электрическая дверь чтоль.. надо включить генератор, только где он.....");
+  speak(server,LakeDialogueLines.LOCKED_DOOR);
   goal(server,"Найти генератор");
  }
  private static boolean lookingAt(ServerPlayerEntity player,BlockPos pos,boolean door){
@@ -344,10 +347,7 @@ public final class LakeStory {
    enterLockedDoor(server,state);return;
   }
   if(LakeStoryPolicy.afterPanel(state.stage,state.homeAttempted)==5&&pos.equals(HOME_PANEL)&&at(player,HOME_PANEL)){
-   next(server,state,5);speak(server,"Кажись придется идти на лесопилку, чтож..");goal(server,"Добраться до лесопилки");return;
-  }
-  if(state.stage==6&&pos.equals(MILL_PANEL)&&at(player,MILL_PANEL)){
-   next(server,state,8);speak(server,"Ага, теперь ясно, надо включить резервный источник питания, и все должно заработать, осталось только его найти, блять");return;
+   next(server,state,5);speak(server,LakeDialogueLines.TO_SAWMILL);goal(server,"Добраться до лесопилки");return;
   }
  }
  private static final List<BlockPos> SCENE_COBWEBS=List.of(new BlockPos(8416,75,8384),new BlockPos(8416,75,8391));

@@ -8,6 +8,11 @@ public class LakeStoryPolicyTest {
   check(LakeStoryPolicy.inStart(8381,72,8366));
   for(int dx:new int[]{-3,3})for(int dy:new int[]{-3,3})for(int dz:new int[]{-3,3})check(LakeStoryPolicy.inStart(8381+dx,72+dy,8366+dz));
   for(double[] p:new double[][]{{8384.001,72,8366},{8381,75.001,8366},{8381,72,8369.001},{8408,72,8380},{8411,72,8383},{8407,71,8382}})check(!LakeStoryPolicy.inStart(p[0],p[1],p[2]));
+  check(LakeStoryPolicy.inBrickRoom(8355.5,72,8434.5));
+  check(LakeStoryPolicy.inBrickRoom(8357.95,74.9,8436.95));
+  for(double[] outside:new double[][]{{8353.9,73,8435},{8358,73,8435},{8356,71.9,8435},
+   {8356,75,8435},{8356,73,8431.9},{8356,73,8437}})
+   check(!LakeStoryPolicy.inBrickRoom(outside[0],outside[1],outside[2]));
   for(int stage=0;stage<12;stage++)for(int pulls=0;pulls<5;pulls++){
    check(LakeStoryPolicy.afterPull(stage,false,pulls)==stage);
    check(LakeStoryPolicy.afterPull(stage,true,pulls)==(stage==3&&pulls>=3?4:stage));

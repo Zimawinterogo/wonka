@@ -1,6 +1,7 @@
 package dev.whiteout.power;
 
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import dev.whiteout.client.DialogueManager;
 import dev.whiteout.client.DialogueScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -13,7 +14,14 @@ import net.minecraft.text.Text;
 
 /** Non-modal, frame-interpolated goal cards. Dialogue ownership is chapter-local. */
 public final class LakeStoryClient {
- private static final String SCRIPT="lake_scene_line";
+ private static final String LEGACY_SCRIPT="lake_scene_line";
+ private static final Set<String> seenDialogues=new HashSet<>();
+ /** Clear only the current lake chapter, never unrelated Whiteout dialogues. */
+ private static void clearLakeDialogues(){
+  seenDialogues.clear();
+  StoryDialogueHud.clearScript(LEGACY_SCRIPT);
+  for(var line:LakeDialogueLines.entries())StoryDialogueHud.clearScript(line.id());
+ }
  private static String current="",pending="";
  private static int ticks,exitTick=-1;
  private static float lastDelta;
@@ -22,7 +30,7 @@ public final class LakeStoryClient {
  private static void start(String goal){current=goal;pending="";ticks=0;exitTick=-1;lastDelta=0;}
  public static void register(){
   ClientPlayNetworking.registerGlobalReceiver(LakeStoryPackets.Story.ID,(message,context)->context.client().execute(()->receive(message)));
-  ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->{clear();StoryDialogueHud.clearScript(SCRIPT);});
+  ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->{clear();clearLakeDialogues();});
   ClientTickEvents.END_CLIENT_TICK.register(mc->{
    if(mc.player==null||mc.world==null){clear();return;}
    if(mc.isPaused()||current.isEmpty())return;
@@ -40,7 +48,7 @@ public final class LakeStoryClient {
  }
  private static void receive(LakeStoryPackets.Story packet){
   MinecraftClient mc=MinecraftClient.getInstance();
-  if(packet.kind()==LakeStoryPackets.RESET){clear();StoryDialogueHud.clearScript(SCRIPT);return;}
+  if(packet.kind()==LakeStoryPackets.RESET){clear();clearLakeDialogues();return;}
   if(packet.kind()==LakeStoryPackets.CLEAR){clear();return;}
   if(packet.kind()==LakeStoryPackets.OBJECTIVE){
    String goal=packet.text();
@@ -49,9 +57,12 @@ public final class LakeStoryClient {
    return;
   }
   if(packet.kind()!=LakeStoryPackets.DIALOGUE||mc.player==null)return;
-  var line=new DialogueManager.Line("Я",packet.text(),"Я",0xFFE1E8F3,"player","",List.of(),null);
-  var script=new DialogueManager.Script(SCRIPT,List.of(),List.of(),List.of(line));
-  StoryDialogueHud.route(mc,new DialogueScreen(script,null,140));
+  // Stable ID, resolved through the original editable Whiteout registry.
+  String id=packet.text();
+  if(!LakeDialogueLines.isLakeId(id)||!seenDialogues.add(id))return;
+  DialogueManager.Script script=DialogueManager.findById(id);
+  if(script==null||script.lines().isEmpty())script=DialogueCatalog.builtinLake(id);
+  if(script!=null)StoryDialogueHud.route(mc,new DialogueScreen(script,null,140));
  }
  private static int color(int rgb,double opacity){return ((int)(Math.max(0,Math.min(1,opacity))*255)<<24)|(rgb&0xffffff);}
  private static void drawGoal(DrawContext context,MinecraftClient mc,double seconds){

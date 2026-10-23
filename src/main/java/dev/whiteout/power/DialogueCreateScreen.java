@@ -31,7 +31,7 @@ public final class DialogueCreateScreen extends SharpScreen {
   String name=id.getText().trim(),who=speaker.getText().trim();
   if(!name.matches("[a-z0-9_:-]{1,64}")){error=tr("invalid_id");return;}
   if(who.isBlank()){error=tr("missing_speaker");return;}
-  if(DialogueManager.findById(name)!=null||DialogueCatalog.OUTAGE_ID.equals(name)){error=tr("duplicate");return;}
+  if(DialogueManager.findById(name)!=null||DialogueCatalog.isBuiltin(name)){error=tr("duplicate");return;}
   try {
    var line=new DialogueManager.Line(who,tr("new_line"),who,0xFFE7F0F5,who.equalsIgnoreCase("Я")?"player":"npc","",List.of(),null);
    var script=new DialogueManager.Script(name,List.of(),List.of(),List.of(line));

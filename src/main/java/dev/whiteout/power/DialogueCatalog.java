@@ -57,6 +57,8 @@ public final class DialogueCatalog {
    indexed.put(OUTAGE_ID,new Entry(OUTAGE_ID,builtinOutage().lines(),true));
   if(!indexed.containsKey(FUSE_ID))
    indexed.put(FUSE_ID,new Entry(FUSE_ID,builtinFuseFailure().lines(),true));
+  for(var line:LakeDialogueLines.entries())
+   if(!indexed.containsKey(line.id()))indexed.put(line.id(),new Entry(line.id(),builtinLake(line.id()).lines(),true));
   return indexed.values().stream().sorted(Comparator.comparing(Entry::id,String.CASE_INSENSITIVE_ORDER)).toList();
  }
 
@@ -69,14 +71,22 @@ public final class DialogueCatalog {
   DialogueManager.Line line=new DialogueManager.Line("Я","Опять предохранитель выбило...","Я",0xFFE1E8F3,"player","",List.of(),null);
   return new DialogueManager.Script(FUSE_ID,List.of(),List.of(),List.of(line));
  }
- public static boolean isBuiltin(String id){return OUTAGE_ID.equals(id)||FUSE_ID.equals(id);}
+ /** Editor-visible fallback; saved dialogue scripts replace it in the registry. */
+ public static DialogueManager.Script builtinLake(String id){
+  String text=LakeDialogueLines.defaultText(id);
+  if(text==null)return null;
+  var line=new DialogueManager.Line("Я",text,"Я",0xFFE1E8F3,"player","",List.of(),null);
+  return new DialogueManager.Script(id,List.of(),List.of(),List.of(line));
+ }
+ public static boolean isBuiltin(String id){return OUTAGE_ID.equals(id)||FUSE_ID.equals(id)||LakeDialogueLines.isLakeId(id);}
 
  /** Materialize the hardcoded line as a user script only when the author actually asks to edit it. */
  public static boolean openEditor(Screen parent,String id){
   DialogueManager.Script script=DialogueManager.findById(id);
   backupBeforeEdit();
   if(script==null&&isBuiltin(id)){
-   if(!DialogueManager.saveScript(OUTAGE_ID.equals(id)?builtinOutage():builtinFuseFailure()))return false;
+   DialogueManager.Script fallback=OUTAGE_ID.equals(id)?builtinOutage():FUSE_ID.equals(id)?builtinFuseFailure():builtinLake(id);
+   if(fallback==null||!DialogueManager.saveScript(fallback))return false;
    script=DialogueManager.findById(id);
   }
   if(script==null)return false;

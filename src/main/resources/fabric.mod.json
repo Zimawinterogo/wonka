@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "whiteout_power_build",
-  "version": "3.12.17",
+  "version": "3.12.18",
   "name": "Whiteout — Белая мгла",
   "environment": "*",
   "entrypoints": {

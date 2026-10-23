@@ -6,6 +6,10 @@ public final class LakeStoryPolicy {
  public static boolean inStart(double x,double y,double z) {
   return Math.abs(x-8381)<=3&&Math.abs(y-72)<=3&&Math.abs(z-8366)<=3;
  }
+ /** Walkable interior of the brick generator room, verified against the save. */
+ public static boolean inBrickRoom(double x,double y,double z){
+  return x>=8354&&x<8358&&y>=72&&y<75&&z>=8432&&z<8437;
+ }
  public static int afterPull(int stage,boolean fueled,int pulls) {
   return stage==3&&fueled&&pulls>=3?4:stage;
  }
