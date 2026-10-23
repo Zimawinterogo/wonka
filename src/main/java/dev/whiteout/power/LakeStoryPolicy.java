@@ -10,6 +10,10 @@ public final class LakeStoryPolicy {
   return stage==3&&fueled&&pulls>=3?4:stage;
  }
  public static int afterPanel(int stage,boolean attempted) {return stage==4&&attempted?5:stage;}
+ public static boolean transition(int from,int to){
+  return switch(from){case 0,1,2,3,4,5,8,9,10 -> to==from+1;case 6 -> to==8;default -> false;};
+ }
+ public static boolean shouldRestore(boolean matchesBefore,boolean matchesAfter,boolean hasBlockEntity){return !hasBlockEntity&&!matchesBefore&&matchesAfter;}
  public static String objective(int stage) {
   if(stage>=2&&stage<=4)return "Найти генератор";
   if(stage==5)return "Добраться до лесопилки";

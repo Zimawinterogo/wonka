@@ -3,7 +3,7 @@ import org.objectweb.asm.tree.*
 
 plugins { id 'fabric-loom' version '1.8.13' }
 loom { mixin { defaultRefmapName = 'whiteout-visual-refmap.json' } }
-version = '3.12.16'
+version = '3.12.17'
 group = 'dev.whiteout'
 base { archivesName = 'whiteout-power' }
 repositories { mavenCentral() }
@@ -64,6 +64,10 @@ tasks.register('assembleWhiteout') {
      def data=patchZip.getInputStream(e).bytes
      if(entries.containsKey(e.name)&&(e.name=='assets/whiteout/sounds.json'||e.name.startsWith('assets/whiteout/lang/'))) {
       def merged=json.parse(entries[e.name]);merged.putAll(json.parse(data));data=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(merged)).getBytes('UTF-8')
+     } else if(entries.containsKey(e.name)&&e.name.startsWith('data/whiteout/')&&e.name.endsWith('.json')&&json.parse(entries[e.name])==json.parse(data)) {
+      // Windows checkouts may normalize line endings. Preserve the original bytes
+      // when the JSON data is identical; changed loot/data still fails below.
+      data=entries[e.name]
      } else if(entries.containsKey(e.name)&&(e.name.startsWith('assets/whiteout/sounds/')||e.name.startsWith('data/whiteout/'))&&!java.util.Arrays.equals(entries[e.name],data))throw new GradleException('Changed existing asset: '+e.name)
      else if(entries.containsKey(e.name)&&shaderHashes.containsKey(e.name)) {
       def originalHash=java.security.MessageDigest.getInstance('SHA-256').digest(entries[e.name]).encodeHex().toString()
@@ -557,7 +561,7 @@ tasks.named('compileJava') { dependsOn 'verifySharpScreens' }
 tasks.named('build') { dependsOn 'assembleWhiteout' }
 
 // All executable regressions use the actual compiled production classes.
-def regressions = ['WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewFeaturesTest',
+def regressions = ['LakeStoryPolicyTest','LakePersistenceTest','WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewFeaturesTest',
  'GridStatePolicyTest','ForestCandidatePolicyTest','AuditRegressionTest','BuildingAtmosphereTest',
  'BackupLampPolicyTest','MultiNetworkRulesTest','SnapshotChunksTest','ZoneFolderOrderTest',
  'ZoneIdBatcherTest','ZoneMusicContinuityTest','GeneratorLifecycleTest','DiagnosticDataTest','LegacyPersistenceTest','GeneratorMeshTest','AuditHardeningTest','StoreSafetyTest','BackpackPolicyTest','BackpackSyncTest','BackpackModelTest','WeatherDepthTimingTest']

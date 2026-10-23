@@ -57,13 +57,20 @@ public final class LakeStory {
  private static final BlockPos LAMP=new BlockPos(8373,76,8414);
  private static final BlockPos OLD_RESERVE=new BlockPos(8385,72,8409);
  private static final BlockPos OLD_LAMP=new BlockPos(8383,72,8411);
- private static final BlockPos SOUND_ORIGIN=new BlockPos(8411,80,8387);
+ private static final BlockPos SOUND_ORIGIN=new BlockPos(8410,80,8383);
+ private static final List<BlockPos> WINDOWS=List.of(SOUND_ORIGIN,SOUND_ORIGIN.up());
  private static final int ONE_CAN=DeviceEntity.CAN_TICKS;
  private static int globalTicks;
  private LakeStory(){}
 
  private static final class State {
   int version=1;
+  LakeBlockJournal journal=new LakeBlockJournal();
+  int finalPhase=0;
+  boolean resetPending=false;
+  boolean decayPrepared=false;
+  String conflict="";
+  transient boolean recovering=true;
   boolean homeFueled=false,homeAttempted=false;
   int homePulls=0;
   java.util.Set<String> waitingExit=new java.util.HashSet<>();
@@ -84,6 +91,9 @@ public final class LakeStory {
   try{
    State state=JSON.fromJson(Files.readString(file(server)),State.class);
    if(state==null||state.version!=1||state.stage<0||state.stage>11)throw new IOException("invalid chapter configuration");
+   if(state.journal==null||state.journal.changes==null||state.waitingExit==null)throw new IOException("invalid scene journal");
+   if(state.finalPhase<0||state.finalPhase>3)throw new IOException("invalid final phase");
+   for(var change:state.journal.changes){change.before.state();change.after.state();}
    return state;
   }catch(Exception ex){
    System.err.println("[Whiteout Lake] Disabled, preserving invalid scene file: "+ex);
@@ -93,10 +103,11 @@ public final class LakeStory {
  private static void save(MinecraftServer server,State state){
   if(state==null||state.loadError!=null)return;
   try{GridFileIO.writeAtomic(file(server),JSON.toJson(state));}
-  catch(Exception ex){System.err.println("[Whiteout Lake] Could not persist scene progress: "+ex);}
+  catch(Exception ex){state.loadError=ex.toString();throw new IllegalStateException("Lake scene stopped: original save preserved",ex);}
  }
  private static void next(MinecraftServer server,State state,int stage){
   if(stage<=state.stage)return;
+  if(!LakeStoryPolicy.transition(state.stage,stage))throw new IllegalStateException("Invalid lake transition "+state.stage+" -> "+stage);
   state.stage=stage;save(server,state);
  }
  private static void goal(MinecraftServer server,String name){
@@ -131,7 +142,7 @@ public final class LakeStory {
  public static boolean homePull(DeviceEntity device){
   State state=scene(device.getWorld());
   if(state==null||!device.getPos().equals(HOME_GEN))return false;
-  if(state.stage==3&&state.homeFueled&&device.fuel>0){
+  if(state.loadError==null&&!state.resetPending&&state.stage==3&&state.homeFueled&&device.fuel>0){
    state.homePulls=Math.min(3,state.homePulls+1);
    if(LakeStoryPolicy.afterPull(state.stage,true,state.homePulls)==4){
     state.homeAttempted=true;next(((ServerWorld)device.getWorld()).getServer(),state,4);
@@ -156,7 +167,7 @@ public final class LakeStory {
  private static boolean close(ServerPlayerEntity player,BlockPos target,int radius){
   if(!player.getServerWorld().getRegistryKey().equals(OVERWORLD)||player.isSpectator())return false;
   double dx=player.getX()-target.getX()-.5,dz=player.getZ()-target.getZ()-.5;
-  return Math.abs(player.getY()-target.getY())<=9&&dx*dx+dz*dz<=radius*radius;
+  return Math.abs(player.getY()-target.getY())<=3&&dx*dx+dz*dz<=radius*radius;
  }
  private static boolean at(ServerPlayerEntity player,BlockPos pos){
   if(!player.getServerWorld().getRegistryKey().equals(OVERWORLD))return false;
@@ -174,7 +185,7 @@ public final class LakeStory {
   }
   gen.emergencyStop();gen.fuel=0;gen.sync();
   // Normal fuse, not an unstable fuse. Without the remote generator this remains OFF.
-  panel.fuse=true;panel.burnt=false;panel.unstableFuse=false;panel.sync();
+  panel.sync();
   state.localPrepared=true;save(server,state);GridManager.refresh(server);
  }
  private static void installReserve(MinecraftServer server,State state,ServerWorld world){
@@ -186,36 +197,74 @@ public final class LakeStory {
    state.reserveInstalled=true;save(server,state);
   }
  }
+ private static void conflict(MinecraftServer server,State state,String message){
+  if(message.equals(state.conflict))return;
+  state.conflict=message;save(server,state);System.err.println("[Whiteout Lake] "+message);
+ }
  private static void ageHouse(MinecraftServer server,State state,ServerWorld world){
   if(state.decayApplied)return;
-  // Only matching spruce planks are modified; pre-existing rotten planks remain untouched.
   List<BlockPos> rotten=List.of(
-   new BlockPos(8413,71,8385),new BlockPos(8409,71,8385),
-   new BlockPos(8412,71,8390),new BlockPos(8410,71,8391),
-   new BlockPos(8415,71,8388),new BlockPos(8405,72,8384),
-   new BlockPos(8417,72,8387),new BlockPos(8417,72,8390),
-   new BlockPos(8408,72,8393),new BlockPos(8410,72,8393));
+   new BlockPos(8413,71,8385),new BlockPos(8409,71,8385),new BlockPos(8412,71,8390),
+   new BlockPos(8410,71,8391),new BlockPos(8415,71,8388),new BlockPos(8405,72,8384),
+   new BlockPos(8417,72,8387),new BlockPos(8417,72,8390),new BlockPos(8408,72,8393),new BlockPos(8410,72,8393));
   for(BlockPos pos:rotten)if(!world.isChunkLoaded(pos))return;
-  for(BlockPos pos:rotten){
-   if(world.getBlockState(pos).isOf(Blocks.SPRUCE_PLANKS))
-    world.setBlockState(pos,PowerDevices.ROTTEN_SPRUCE_PLANKS.getDefaultState(),Block.NOTIFY_ALL);
+  for(BlockPos pos:SCENE_COBWEBS)if(!world.isChunkLoaded(pos))return;
+  if(!state.decayPrepared){
+   for(BlockPos pos:rotten)if(world.getBlockState(pos).isOf(Blocks.SPRUCE_PLANKS)&&world.getBlockEntity(pos)==null)
+    state.journal.add(world,pos,PowerDevices.ROTTEN_SPRUCE_PLANKS.getDefaultState(),"decay");
+   for(BlockPos pos:SCENE_COBWEBS)if(world.getBlockState(pos).isAir()&&world.getBlockEntity(pos)==null)
+    state.journal.add(world,pos,Blocks.COBWEB.getDefaultState(),"decay");
+   state.decayPrepared=true;save(server,state); // write-ahead, once rather than every retry
   }
-  // High corners: cobwebs suggest neglect without blocking the narrow entrance.
-  for(BlockPos cobweb:List.of(new BlockPos(8416,75,8384),new BlockPos(8416,75,8391))){
-   if(world.getBlockState(cobweb).isAir())world.setBlockState(cobweb,Blocks.COBWEB.getDefaultState(),Block.NOTIFY_ALL);
-  }
+  if(!state.journal.apply(world,"decay")){conflict(server,state,"Decoration changed; preserving player blocks");return;}
+  // Three durable transaction boundaries per playthrough (decay, glass, explicit
+  // reset), never a tick loop. Completed edits must not be replayed over later builds.
+  world.getChunkManager().save(true);
   state.decayApplied=true;save(server,state);
  }
+ private static boolean glass(BlockState block){
+  String id=net.minecraft.registry.Registries.BLOCK.getId(block.getBlock()).toString();
+  return id.equals("minecraft:glass")||id.equals("minecraft:glass_pane")||
+   (id.startsWith("minecraft:")&&(id.endsWith("_stained_glass")||id.endsWith("_stained_glass_pane")))||
+   id.equals("whiteout:rime_glass")||id.equals("whiteout:rime_glass_pane");
+ }
  private static void playFinalSound(MinecraftServer server,State state,ServerWorld world){
-  world.playSound(null,SOUND_ORIGIN,SoundEvents.BLOCK_WOOD_STEP,SoundCategory.BLOCKS,1.2f,.62f);
-  world.playSound(null,SOUND_ORIGIN,SoundEvents.BLOCK_WOODEN_DOOR_CLOSE,SoundCategory.BLOCKS,.85f,.68f);
-  speak(server,"Там что-то наверху, мне надо проверить. может рыбаку нужна помощь?");
-  clear(server);next(server,state,11);
+  for(BlockPos pos:WINDOWS)if(!world.isChunkLoaded(pos))return;
+  if(state.finalPhase==0){
+   for(BlockPos pos:WINDOWS)if(!glass(world.getBlockState(pos))||world.getBlockEntity(pos)!=null){
+    conflict(server,state,"Window preflight failed at "+pos.toShortString()+": "+world.getBlockState(pos));return;
+   }
+   for(BlockPos pos:WINDOWS)state.journal.add(world,pos,Blocks.AIR.getDefaultState(),"glass");
+   state.finalPhase=1;save(server,state);
+  }
+  if(state.finalPhase==1){
+   if(!state.journal.apply(world,"glass")){conflict(server,state,"Window replaced after snapshot; finale paused");return;}
+   world.getChunkManager().save(true);
+   state.finalPhase=2;state.finalSoundAt=world.getTime()+35;save(server,state);
+   world.playSound(null,SOUND_ORIGIN,SoundEvents.BLOCK_GLASS_BREAK,SoundCategory.BLOCKS,4f,.85f);
+   for(var change:state.journal.changes)if(change.group.equals("glass")){
+    BlockPos pos=change.pos();
+    world.spawnParticles(new net.minecraft.particle.BlockStateParticleEffect(net.minecraft.particle.ParticleTypes.BLOCK,change.before.state()),
+     pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,35,.35,.45,.25,.12);
+   }
+   return;
+  }
+  if(state.finalPhase==2&&world.getTime()>=state.finalSoundAt){
+   state.finalPhase=3;next(server,state,11);
+   speak(server,"Там что-то наверху, мне надо проверить. может рыбаку нужна помощь?");clear(server);
+  }
  }
  private static void tick(MinecraftServer server,State state){
-  if(!state.enabled)return;
+  if(!state.enabled||state.loadError!=null)return;
   ServerWorld world=server.getWorld(OVERWORLD);
   if(world==null)return;
+  if(state.resetPending){finishReset(server,state,world);return;}
+  if(state.recovering){
+   for(var change:state.journal.changes)if(!world.isChunkLoaded(change.pos()))return;
+   if((!state.decayApplied&&!state.journal.apply(world,"decay"))||(state.finalPhase==1&&!state.journal.apply(world,"glass")))
+    conflict(server,state,"Journal recovery conflict: preserving changed blocks");
+   state.recovering=false;
+  }
   prepareLocal(server,state,world);
   installReserve(server,state,world);
   if(state.stage>=9)ageHouse(server,state,world);
@@ -249,6 +298,9 @@ public final class LakeStory {
    if(state.stage==2&&close(player,HOME_GEN,4)){
     next(server,state,3);speak(server,"Ну что за напасть ебаная, ладно может все не так плохо");return;
    }
+   if(LakeStoryPolicy.afterPanel(state.stage,state.homeAttempted)==5&&at(player,HOME_PANEL)&&lookingAt(player,HOME_PANEL,false)){
+    used(player,world,HOME_PANEL);return;
+   }
    if(state.stage==5&&close(player,MILL_ENTRY,4)){
     next(server,state,6);
     world.playSound(null,new BlockPos(8378,73,8420),PowerDevices.OLD_CREAK,SoundCategory.BLOCKS,.8f,.83f);
@@ -266,10 +318,10 @@ public final class LakeStory {
    }
    if(state.stage==9&&close(player,DOOR,4)&&player.getBlockPos().getZ()>DOOR.getZ()){
     // Only progress after the player is inside the cabin, not from a nearby yard.
-    if(player.getX()>8407&&player.getX()<8417&&player.getZ()>8383&&player.getZ()<8393&&player.getY()>71){
-     next(server,state,10);
+    if(player.getX()>8407&&player.getX()<8417&&player.getZ()>8383&&player.getZ()<8393&&player.getY()>71&&player.getY()<76){
+     state.finalSoundAt=world.getTime()+150;next(server,state,10);
      speak(server,"Какого хуя тут все гнилое?? я же вчера заходил к нему,, все нормально было..");
-     state.finalSoundAt=world.getTime()+110;save(server,state);return;
+     clear(server);return;
     }
    }
   }
@@ -287,7 +339,7 @@ public final class LakeStory {
  }
  private static void used(ServerPlayerEntity player,ServerWorld world,BlockPos pos){
   MinecraftServer server=player.getServer();State state=STATES.get(server);
-  if(state==null||!state.enabled||player.isSpectator()||!world.getRegistryKey().equals(OVERWORLD))return;
+  if(state==null||!state.enabled||state.loadError!=null||state.resetPending||player.isSpectator()||!world.getRegistryKey().equals(OVERWORLD))return;
   if(state.stage==1&&sameDoor(pos)&&at(player,DOOR)){
    enterLockedDoor(server,state);return;
   }
@@ -298,58 +350,47 @@ public final class LakeStory {
    next(server,state,8);speak(server,"Ага, теперь ясно, надо включить резервный источник питания, и все должно заработать, осталось только его найти, блять");return;
   }
  }
- private static final List<BlockPos> DECAY_ORIGINALLY_SPRUCE=List.of(
-  new BlockPos(8413,71,8385),new BlockPos(8410,71,8391),
-  new BlockPos(8415,71,8388),new BlockPos(8405,72,8384),
-  new BlockPos(8417,72,8390),new BlockPos(8410,72,8393));
- private static final List<BlockPos> SCENE_COBWEBS=List.of(
-  new BlockPos(8416,75,8384),new BlockPos(8416,75,8391));
+ private static final List<BlockPos> SCENE_COBWEBS=List.of(new BlockPos(8416,75,8384),new BlockPos(8416,75,8391));
  private static void ensureChunk(ServerWorld world,BlockPos pos){world.getChunk(pos.getX()>>4,pos.getZ()>>4);}
+ private static void finishReset(MinecraftServer server,State state,ServerWorld world){
+  // Tick recovery waits for chunks; explicit operator reset loads this bounded set.
+  for(BlockPos pos:List.of(HOME_GEN,HOME_PANEL,RESERVE,MILL_GEN))if(!world.isChunkLoaded(pos))return;
+  for(var change:state.journal.changes)if(!world.isChunkLoaded(change.pos()))return;
+  int conflicts=state.journal.restore(world);
+  for(BlockPos pos:List.of(RESERVE,HOME_GEN,MILL_GEN)){
+   DeviceEntity gen=device(world,pos);if(gen!=null&&gen.kind()==3){gen.emergencyStop();if(pos.equals(HOME_GEN))gen.fuel=0;gen.sync();}
+  }
+  state.stage=0;state.localPrepared=true;state.millActivated=false;state.millSnapshotValid=false;
+  state.decayApplied=false;state.decayPrepared=false;state.finalSoundAt=0;state.finalPhase=0;
+  state.homeFueled=false;state.homeAttempted=false;state.homePulls=0;
+  state.waitingExit.clear();state.inside.clear();state.rearmAfterExit=false;
+  for(ServerPlayerEntity p:server.getPlayerManager().getPlayerList())if(inStart(p)){state.waitingExit.add(p.getUuidAsString());state.inside.add(p.getUuidAsString());}
+  world.getChunkManager().save(true);
+  state.journal.changes.clear();state.resetPending=false;state.recovering=false;
+  state.conflict=conflicts==0?"":"Reset preserved "+conflicts+" player replacements";
+  save(server,state);GridManager.refresh(server);
+  for(ServerPlayerEntity p:server.getPlayerManager().getPlayerList())ServerPlayNetworking.send(p,new LakeStoryPackets.Story(LakeStoryPackets.RESET,""));
+ }
  private static int reset(net.minecraft.server.command.ServerCommandSource source){
   MinecraftServer server=source.getServer();State state=STATES.get(server);
-  if(state==null||state.loadError!=null){
-   source.sendError(Text.literal("Сцена не установлена в этом мире или её конфигурация повреждена"));return 0;
-  }
+  if(state==null||state.loadError!=null||!state.enabled){source.sendError(Text.literal("Сцена не установлена, отключена или её конфигурация повреждена"));return 0;}
+  ServerWorld world=server.getWorld(OVERWORLD);if(world==null)return 0;
+  state.resetPending=true;save(server,state);
+  for(BlockPos pos:List.of(HOME_GEN,HOME_PANEL,RESERVE,MILL_GEN))ensureChunk(world,pos);
+  for(var change:state.journal.changes)ensureChunk(world,change.pos());
+  finishReset(server,state,world);
+  source.sendFeedback(()->Text.literal("[Whiteout] Сцена сброшена. Выйди из зоны 8381 72 8366 ±3 и войди снова. "+state.conflict),false);return 1;
+ }
+ private static String status(MinecraftServer server,State state){
+  if(state==null)return "не установлена";
   ServerWorld world=server.getWorld(OVERWORLD);
-  if(world==null)return 0;
-  // An explicit operator command may synchronously load the few affected chunks;
-  // ordinary story ticking never force-loads chunks.
-  for(BlockPos pos:List.of(HOME_GEN,HOME_PANEL,RESERVE,LAMP,OLD_RESERVE,OLD_LAMP,MILL_GEN,MILL_PANEL,DOOR))ensureChunk(world,pos);
-  for(BlockPos pos:DECAY_ORIGINALLY_SPRUCE){ensureChunk(world,pos);
-   if(state.decayApplied&&world.getBlockState(pos).isOf(PowerDevices.ROTTEN_SPRUCE_PLANKS))
-    world.setBlockState(pos,Blocks.SPRUCE_PLANKS.getDefaultState(),Block.NOTIFY_ALL);
-  }
-  for(BlockPos pos:SCENE_COBWEBS){ensureChunk(world,pos);
-   if(state.decayApplied&&world.getBlockState(pos).isOf(Blocks.COBWEB))world.setBlockState(pos,Blocks.AIR.getDefaultState(),Block.NOTIFY_ALL);
-  }
-  DeviceEntity reserve=device(world,RESERVE);
-  if(reserve!=null&&reserve.kind()==3){reserve.emergencyStop();reserve.sync();}
-  DeviceEntity local=device(world,HOME_GEN);
-  if(local!=null&&local.kind()==3){local.emergencyStop();local.fuel=0;local.sync();}
-  DeviceEntity panel=device(world,HOME_PANEL);
-  if(panel!=null&&panel.kind()==1){panel.fuse=true;panel.burnt=false;panel.unstableFuse=false;panel.sync();}
-  DeviceEntity oldmill=device(world,MILL_GEN);
-  if(oldmill!=null&&oldmill.kind()==3&&state.millActivated){
-   oldmill.emergencyStop();
-   if(state.millSnapshotValid){oldmill.fuel=state.millFuelBefore;}
-   oldmill.sync();
-  }
-  DeviceEntity millPanel=device(world,MILL_PANEL);
-  if(state.millActivated&&state.millSnapshotValid&&millPanel!=null&&millPanel.kind()==1){
-   millPanel.fuse=state.millFuseBefore;millPanel.burnt=state.millBurntBefore;
-   millPanel.unstableFuse=state.millUnstableBefore;millPanel.sync();
-  }
-  state.stage=0;state.enabled=true;state.localPrepared=false;
-  state.millActivated=false;state.millSnapshotValid=false;state.decayApplied=false;
-  state.finalSoundAt=0;state.rearmAfterExit=false;
-  state.homeFueled=false;state.homeAttempted=false;state.homePulls=0;
-  state.waitingExit.clear();state.inside.clear();
-  for(ServerPlayerEntity p:server.getPlayerManager().getPlayerList())if(inStart(p)){state.waitingExit.add(p.getUuidAsString());state.inside.add(p.getUuidAsString());}
-  save(server,state);GridManager.refresh(server);
-  for(ServerPlayerEntity p:server.getPlayerManager().getPlayerList())
-   ServerPlayNetworking.send(p,new LakeStoryPackets.Story(LakeStoryPackets.RESET,""));
-  source.sendFeedback(()->Text.literal("[Whiteout] Тьма у озера: сцена, задания, декорации и генераторы сброшены. Выйди из зоны 8381 72 8366 ±3 и снова войди на мостик."),false);
-  return 1;
+  DeviceEntity home=world==null?null:device(world,HOME_GEN),reserve=world==null?null:device(world,RESERVE);
+  return "stage="+state.stage+", waitingExit="+state.waitingExit+", resetPending="+state.resetPending+
+   ", fueled="+state.homeFueled+", homeFuel="+(home==null?"unloaded":home.fuel)+", pulls="+state.homePulls+
+   ", attempted="+state.homeAttempted+", reserveActive="+(reserve==null?"unloaded":reserve.active())+
+   ", finalPhase="+state.finalPhase+", finalLine="+(state.finalPhase==3)+", windows="+
+   WINDOWS.stream().map(pos->world==null||!world.isChunkLoaded(pos)?"unloaded":world.getBlockState(pos).toString()).toList()+
+   ", objective="+activeGoal(state.stage)+", conflict="+state.conflict+", error="+state.loadError;
  }
  public static void register(){
   CommandRegistrationCallback.EVENT.register((dispatcher,registry,environment)->
@@ -358,7 +399,7 @@ public final class LakeStory {
      .then(literal("reset").executes(context->reset(context.getSource())))
      .then(literal("status").executes(context->{
       State state=STATES.get(context.getSource().getServer());
-      context.getSource().sendFeedback(()->Text.literal("[Whiteout Lake] "+(state==null?"не установлена":"этап "+state.stage+", резерв "+state.reserveInstalled+", ожидание выхода "+state.rearmAfterExit)),false);
+      context.getSource().sendFeedback(()->Text.literal("[Whiteout Lake] "+status(context.getSource().getServer(),state)),false);
       return 1;
      })))));
   LakeStoryPackets.register();
@@ -380,7 +421,9 @@ public final class LakeStory {
   });
   ServerTickEvents.END_SERVER_TICK.register(server->{
    if(++globalTicks%5!=0)return;
-   State state=STATES.get(server);if(state!=null)tick(server,state);
+   State state=STATES.get(server);if(state!=null)try{tick(server,state);}catch(RuntimeException ex){
+    state.loadError=ex.toString();System.err.println("[Whiteout Lake] Scene paused safely: "+ex);
+   }
   });
  }
 }

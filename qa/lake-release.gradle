@@ -1,0 +1,61 @@
+import org.objectweb.asm.*
+import org.objectweb.asm.tree.*
+
+initscript {
+ repositories { mavenCentral() }
+ dependencies { classpath 'org.ow2.asm:asm-tree:9.7.1' }
+}
+
+// Run with: gradlew -I qa/lake-release.gradle verifyLakeRelease
+gradle.projectsEvaluated {
+ def p=gradle.rootProject
+ p.tasks.register('verifyLakeRelease') {
+  dependsOn p.tasks.named('assembleWhiteout')
+  doLast {
+   def file=p.layout.buildDirectory.file("release/Whiteout-${p.version}-1.21.1.jar").get().asFile
+   def zip=new java.util.zip.ZipFile(file)
+   def base=new java.util.zip.ZipFile(p.file('base/Whiteout-3.4.2-1.21.1.jar'))
+   try {
+    def read={String name->def e=zip.getEntry(name);assert e!=null:"Missing merged entry ${name}";zip.getInputStream(e).bytes}
+    def node={String name->def c=new ClassNode();new ClassReader(read(name+'.class')).accept(c,0);c}
+    def invokes={c,String method,String owner,String name->
+     c.methods.findAll{it.name==method}.any{m->m.instructions.toArray().any{it instanceof MethodInsnNode&&it.owner==owner&&it.name==name}}
+    }
+    def prefix='dev/whiteout/power/'
+    for(String name:['LakeStory','LakeStoryClient','LakeStoryPackets','LakeStoryPolicy','LakeBlockJournal'])node(prefix+name)
+    assert invokes(node(prefix+'PowerDevices'),'onInitialize',prefix+'LakeStory','register')
+    assert invokes(node(prefix+'PowerClient'),'onInitializeClient',prefix+'LakeStoryClient','register')
+    def dev=node(prefix+'DeviceEntity')
+    for(String method:['interact','pull','setActive'])assert invokes(dev,method,prefix+'LakeStory','blocked'):method
+    assert invokes(dev,'interact',prefix+'LakeStory','refueled')
+    assert invokes(dev,'pull',prefix+'LakeStory','homePull')
+    def interaction=dev.methods.find{it.name=='interact'}.instructions.toArray().toList()
+    int guard=interaction.findIndexOf{it instanceof MethodInsnNode&&it.owner==prefix+'LakeStory'&&it.name=='blocked'}
+    int fuel=interaction.findIndexOf{it instanceof FieldInsnNode&&it.name=='fuel'&&it.opcode==Opcodes.PUTFIELD}
+    assert guard>=0&&fuel>guard:'Fuel must be guarded before inventory mutation'
+    assert node(prefix+'PowerNetwork').methods.any{m->invokes(node(prefix+'PowerNetwork'),m.name,prefix+'LakeStory','blocked')}
+    def hud=node(prefix+'LakeStoryClient')
+    assert invokes(hud,'receive',prefix+'StoryDialogueHud','clearScript')
+    assert !hud.methods.any{m->invokes(hud,m.name,prefix+'StoryDialogueHud','clear')}
+    assert invokes(node(prefix+'GridManager'),'powered',prefix+'LakeStory','circuitPower')
+    def manager=node('dev/whiteout/client/DialogueManager')
+    assert invokes(manager,'open',prefix+'StoryDialogueHud','route')
+    assert invokes(manager,'openDirector',prefix+'StoryDialogueHud','route')
+    int retained=0
+    base.entries().each{e->
+     if(!e.directory&&!e.name.matches('assets/whiteout/sounds/music_slot_.*\\.ogg')){
+      assert zip.getEntry(e.name)!=null:'Missing base resource '+e.name
+      if(e.name.startsWith('data/')||(e.name.startsWith('assets/whiteout/sounds/')&&e.name.endsWith('.ogg'))){
+       assert java.util.Arrays.equals(base.getInputStream(e).bytes,read(e.name)):'Changed original resource '+e.name
+       retained++
+      }
+     }
+    }
+    def metadata=new groovy.json.JsonSlurper().parse(read('fabric.mod.json'))
+    assert metadata.version==p.version.toString()
+    assert metadata.entrypoints.main.contains(prefix.replace('/','.')+'PowerDevices')
+    println "PASS merged lake release: guards, fuel ordering, bootstrap, native HUD routing, metadata; ${retained} base data/audio entries byte-identical"
+   } finally {zip.close();base.close()}
+  }
+ }
+}
