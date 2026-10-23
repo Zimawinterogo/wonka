@@ -22,7 +22,7 @@ gradle.projectsEvaluated {
      c.methods.findAll{it.name==method}.any{m->m.instructions.toArray().any{it instanceof MethodInsnNode&&it.owner==owner&&it.name==name}}
     }
     def prefix='dev/whiteout/power/'
-    for(String name:['LakeStory','LakeStoryClient','LakeStoryPackets','LakeStoryPolicy','LakeBlockJournal'])node(prefix+name)
+    for(String name:['LakeStory','LakeStoryClient','LakeStoryPackets','LakeStoryPolicy','LakeBlockJournal','LakeDialogueLines'])node(prefix+name)
     assert invokes(node(prefix+'PowerDevices'),'onInitialize',prefix+'LakeStory','register')
     assert invokes(node(prefix+'PowerClient'),'onInitializeClient',prefix+'LakeStoryClient','register')
     def dev=node(prefix+'DeviceEntity')
@@ -35,7 +35,11 @@ gradle.projectsEvaluated {
     assert guard>=0&&fuel>guard:'Fuel must be guarded before inventory mutation'
     assert node(prefix+'PowerNetwork').methods.any{m->invokes(node(prefix+'PowerNetwork'),m.name,prefix+'LakeStory','blocked')}
     def hud=node(prefix+'LakeStoryClient')
-    assert invokes(hud,'receive',prefix+'StoryDialogueHud','clearScript')
+    assert invokes(hud,'clearLakeDialogues',prefix+'StoryDialogueHud','clearScript')
+    assert invokes(hud,'receive',prefix+'LakeStoryClient','clearLakeDialogues')
+    assert invokes(hud,'receive','dev/whiteout/client/DialogueManager','findById')
+    assert invokes(hud,'receive',prefix+'StoryDialogueHud','route')
+    assert invokes(node(prefix+'DialogueCatalog'),'entries',prefix+'LakeDialogueLines','entries')
     assert !hud.methods.any{m->invokes(hud,m.name,prefix+'StoryDialogueHud','clear')}
     assert invokes(node(prefix+'GridManager'),'powered',prefix+'LakeStory','circuitPower')
     def manager=node('dev/whiteout/client/DialogueManager')
