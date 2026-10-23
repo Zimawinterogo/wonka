@@ -105,5 +105,14 @@ public final class StoryDialogueHud {
    display.resize(mc,w,h);lastWidth=w;lastHeight=h;
   }
  }
+ /** Remove only entries owned by one story; preserve unrelated active/queued dialogue. */
+ public static void clearScript(String id){
+  QUEUE.removeIf(entry->entry.id.equals(id));
+  if(current!=null&&current.id.equals(id)){
+   current=null;display=null;remaining=0;
+   StoryPortraits.hintNpc("",List.of());
+   if(owner!=null&&owner.world!=null&&owner.player!=null&&owner.currentScreen==null)next(owner);
+  }
+ }
  public static void clear(){QUEUE.clear();current=null;display=null;owner=null;remaining=0;lastWidth=-1;lastHeight=-1;StoryPortraits.hintNpc("",List.of());}
 }
