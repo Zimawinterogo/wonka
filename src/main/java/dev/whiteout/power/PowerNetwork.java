@@ -51,6 +51,7 @@ public final class PowerNetwork {
   ServerPlayNetworking.registerGlobalReceiver(Action.ID,(v,c)->c.server().execute(()->{
    var p=c.player();var w=p.getServerWorld();
    if(p.isSpectator()||!p.isAlive()||p.squaredDistanceTo(v.pos.toCenterPos())>36||!w.isChunkLoaded(v.pos))return;
+   if(LakeStory.blocked(w,v.pos))return;
    if(w.getBlockEntity(v.pos) instanceof DeviceEntity e){
     if(v.operation>=100&&v.operation<=200&&e.kind()==1&&p.isCreative()&&p.hasPermissionLevel(2)){
      e.fuseFailureChance=(v.operation-100)/100f;e.sync();

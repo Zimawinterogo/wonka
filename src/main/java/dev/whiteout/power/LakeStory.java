@@ -44,7 +44,7 @@ public final class LakeStory {
  private static final Map<MinecraftServer,State> STATES=new WeakHashMap<>();
  private static final RegistryKey<net.minecraft.world.World> OVERWORLD=RegistryKey.of(RegistryKeys.WORLD,Identifier.of("minecraft","overworld"));
  // The actual short spruce-plank bridge approaches the cabin from the north.
- private static final BlockPos BRIDGE=new BlockPos(8408,72,8380);
+ private static final BlockPos BRIDGE=new BlockPos(8381,72,8366);
  private static final BlockPos HOME=new BlockPos(8407,71,8382);
  private static final BlockPos DOOR=new BlockPos(8411,72,8383);
  private static final BlockPos HOME_GEN=new BlockPos(8404,71,8392);
@@ -64,6 +64,10 @@ public final class LakeStory {
 
  private static final class State {
   int version=1;
+  boolean homeFueled=false,homeAttempted=false;
+  int homePulls=0;
+  java.util.Set<String> waitingExit=new java.util.HashSet<>();
+  transient java.util.Set<String> inside=new java.util.HashSet<>();
   boolean enabled=true;
   int stage=0;
   boolean localPrepared=false, reserveInstalled=false, millActivated=false, decayApplied=false;
@@ -107,12 +111,47 @@ public final class LakeStory {
   for(ServerPlayerEntity player:server.getPlayerManager().getPlayerList())
    ServerPlayNetworking.send(player,new LakeStoryPackets.Story(LakeStoryPackets.CLEAR,""));
  }
- private static String activeGoal(int stage){
-  if(stage>=2&&stage<=4)return "Найти генератор";
-  if(stage==5)return "Добраться до лесопилки";
-  if(stage>=6&&stage<=8)return "Восстановить электроснабжение";
-  if(stage==9)return "Вернуться к дому";
-  return "";
+ private static String activeGoal(int stage){return LakeStoryPolicy.objective(stage);}
+ private static boolean inStart(ServerPlayerEntity player){
+  return !player.isSpectator()&&player.getServerWorld().getRegistryKey().equals(OVERWORLD)
+   &&LakeStoryPolicy.inStart(player.getX(),player.getY(),player.getZ());
+ }
+ private static State scene(net.minecraft.world.World world){
+  if(!(world instanceof ServerWorld sw)||!sw.getRegistryKey().equals(OVERWORLD))return null;
+  State state=STATES.get(sw.getServer());return state!=null&&state.enabled?state:null;
+ }
+ public static boolean blocked(net.minecraft.world.World world,BlockPos pos){return scene(world)!=null&&pos.equals(MILL_GEN);}
+ public static boolean brokenHome(net.minecraft.world.World world,BlockPos pos){return scene(world)!=null&&pos.equals(HOME_GEN);}
+ public static void refueled(DeviceEntity device){
+  State state=scene(device.getWorld());
+  if(state==null||!device.getPos().equals(HOME_GEN)||device.fuel<=0)return;
+  if(!state.homeFueled){state.homeFueled=true;save(((ServerWorld)device.getWorld()).getServer(),state);}
+ }
+ /** Called only after DeviceEntity authenticated the starter operator, range, fuel and cooldown. */
+ public static boolean homePull(DeviceEntity device){
+  State state=scene(device.getWorld());
+  if(state==null||!device.getPos().equals(HOME_GEN))return false;
+  if(state.stage==3&&state.homeFueled&&device.fuel>0){
+   state.homePulls=Math.min(3,state.homePulls+1);
+   if(LakeStoryPolicy.afterPull(state.stage,true,state.homePulls)==4){
+    state.homeAttempted=true;next(((ServerWorld)device.getWorld()).getServer(),state,4);
+    speak(((ServerWorld)device.getWorld()).getServer(),"Мда блять");
+   }else save(((ServerWorld)device.getWorld()).getServer(),state);
+  }
+  return true;
+ }
+ public static boolean homeAttemptComplete(DeviceEntity device){State s=scene(device.getWorld());return s!=null&&s.homeAttempted;}
+ public static boolean cabinLocked(ServerWorld world,BlockPos pos){
+  State s=scene(world);return s!=null&&sameDoor(pos)&&s.stage<8;
+ }
+ /** Scene-only reserve feed. Circuit ownership, fuses and quest fields are never rewritten. */
+ static Boolean circuitPower(MinecraftServer server,GridManager.Config grid){
+  State s=STATES.get(server);if(s==null||!s.enabled||!"minecraft:overworld".equals(grid.dimension))return null;
+  if(grid.panelBound&&grid.generatorBound&&grid.panel().equals(HOME_PANEL)&&grid.generator().equals(RESERVE))
+   return s.stage<8?Boolean.FALSE:null;
+  if(grid.panelBound&&grid.generatorBound&&grid.panel().equals(MILL_PANEL)&&grid.generator().equals(MILL_GEN))
+   return s.stage>=8&&GridManager.lakeReserveBound(server)&&GridManager.networkPowered(server,"circuit_3");
+  return null;
  }
  private static boolean close(ServerPlayerEntity player,BlockPos target,int radius){
   if(!player.getServerWorld().getRegistryKey().equals(OVERWORLD)||player.isSpectator())return false;
@@ -121,7 +160,7 @@ public final class LakeStory {
  }
  private static boolean at(ServerPlayerEntity player,BlockPos pos){
   if(!player.getServerWorld().getRegistryKey().equals(OVERWORLD))return false;
-  return close(player,pos,5);
+  return !player.isSpectator()&&player.squaredDistanceTo(pos.toCenterPos())<=20.25;
  }
  private static boolean sameDoor(BlockPos clicked){return clicked.equals(DOOR)||clicked.equals(DOOR.up());}
  private static DeviceEntity device(ServerWorld world,BlockPos pos){
@@ -139,57 +178,13 @@ public final class LakeStory {
   state.localPrepared=true;save(server,state);GridManager.refresh(server);
  }
  private static void installReserve(MinecraftServer server,State state,ServerWorld world){
-  if(!world.isChunkLoaded(RESERVE)||!world.isChunkLoaded(LAMP))return;
-  // Migrate blocks from the first 3.12.15 test version only when this scene
-  // itself installed them, never destroy a player's unrelated construction.
-  if(!state.reserveInstalled && world.getBlockState(RESERVE).isOf(PowerDevices.OLD_GENERATOR)){
+  // Placement is handled by the separately verified map copy. Runtime never erases
+  // a same-type player block at an old test position or silently claims ownership.
+  if(!world.isChunkLoaded(RESERVE))return;
+  DeviceEntity reserve=device(world,RESERVE);
+  if(reserve!=null&&reserve.kind()==3&&GridManager.lakeReserveBound(server)&&!state.reserveInstalled){
    state.reserveInstalled=true;save(server,state);
   }
-  if(world.isChunkLoaded(OLD_RESERVE)&&state.reserveInstalled
-     &&world.getBlockState(OLD_RESERVE).isOf(PowerDevices.OLD_GENERATOR)){
-   // Old provisional generator belonged to this scene. Remove it once, but
-   // never touch an unrelated block or the user's original sawmill generator.
-   world.setBlockState(OLD_RESERVE,Blocks.AIR.getDefaultState(),Block.NOTIFY_ALL);
-   if(world.isChunkLoaded(OLD_LAMP)&&world.getBlockState(OLD_LAMP).isOf(PowerDevices.EMERGENCY_LAMP))
-    world.setBlockState(OLD_LAMP,Blocks.AIR.getDefaultState(),Block.NOTIFY_ALL);
-   state.reserveInstalled=world.getBlockState(RESERVE).isOf(PowerDevices.OLD_GENERATOR);
-   save(server,state);
-  }
-  if(state.reserveInstalled && world.getBlockState(RESERVE).isOf(PowerDevices.OLD_GENERATOR)){
-   GridManager.relocateLakeReserve(server,OLD_RESERVE,RESERVE);
-   GridManager.linkLakeEmergencyLamp(server,LAMP);
-   return;
-  }
-  // User-provided position is on an upper spruce-slab landing; top slabs have
-  // a full upward supporting face. Do not alter the landing, rails or walls.
-  if(!world.getBlockState(RESERVE).isAir()||!world.getBlockState(LAMP).isAir()
-     ||!world.getBlockState(RESERVE.down()).isSideSolidFullSquare(world,RESERVE.down(),net.minecraft.util.math.Direction.UP)
-     ||!world.getBlockState(LAMP.down()).isSideSolidFullSquare(world,LAMP.down(),net.minecraft.util.math.Direction.UP)){
-   System.err.println("[Whiteout Lake] Reserve placement aborted: occupied position or unsupported floor.");return;
-  }
-  if(!GridManager.relocateLakeReserve(server,OLD_RESERVE,RESERVE)){
-   System.err.println("[Whiteout Lake] Cannot rebind circuit_3 safely. No reserve was placed.");return;
-  }
-  world.setBlockState(RESERVE,PowerDevices.OLD_GENERATOR.getDefaultState().with(DeviceBlock.FACING,net.minecraft.util.math.Direction.WEST),Block.NOTIFY_ALL);
-  world.setBlockState(LAMP,PowerDevices.EMERGENCY_LAMP.getDefaultState(),Block.NOTIFY_ALL);
-  DeviceEntity gen=device(world,RESERVE);
-  if(gen==null){System.err.println("[Whiteout Lake] Could not create reserve block entity");return;}
-  gen.fuel=ONE_CAN*2;gen.sync();
-  if(!GridManager.linkLakeEmergencyLamp(server,LAMP))
-   System.err.println("[Whiteout Lake] Could not bind the emergency lamp to circuit_3");
-  state.reserveInstalled=true;save(server,state);GridManager.refresh(server);
- }
- private static void activateSawmill(MinecraftServer server,State state,ServerWorld world){
-  if(state.millActivated||!world.isChunkLoaded(MILL_GEN)||!world.isChunkLoaded(MILL_PANEL))return;
-  DeviceEntity gen=device(world,MILL_GEN),panel=device(world,MILL_PANEL);
-  if(gen==null||panel==null||gen.kind()!=3||panel.kind()!=1)return;
-  state.millSnapshotValid=true;
-  state.millFuelBefore=gen.fuel;state.millWasRunning=gen.active();
-  state.millFuseBefore=panel.fuse;state.millBurntBefore=panel.burnt;
-  state.millUnstableBefore=panel.unstableFuse;
-  panel.fuse=true;panel.burnt=false;panel.unstableFuse=false;panel.sync();
-  gen.fuel=Math.max(gen.fuel,ONE_CAN);gen.sync();gen.setActive(true);
-  state.millActivated=true;save(server,state);GridManager.refresh(server);
  }
  private static void ageHouse(MinecraftServer server,State state,ServerWorld world){
   if(state.decayApplied)return;
@@ -223,7 +218,7 @@ public final class LakeStory {
   if(world==null)return;
   prepareLocal(server,state,world);
   installReserve(server,state,world);
-  if(state.stage>=9){activateSawmill(server,state,world);ageHouse(server,state,world);}
+  if(state.stage>=9)ageHouse(server,state,world);
   if(state.stage==10){
    if(world.getTime()>=state.finalSoundAt&&state.decayApplied&&world.getPlayers().stream().anyMatch(p->
      p.getX()>8407&&p.getX()<8417&&p.getZ()>8383&&p.getZ()<8393&&p.getY()>71)){
@@ -233,18 +228,19 @@ public final class LakeStory {
   }
   for(ServerPlayerEntity player:world.getPlayers()){
    if(state.stage==0){
-    if(state.rearmAfterExit){
-     if(!close(player,BRIDGE,9)&&!close(player,DOOR,9)){
-      state.rearmAfterExit=false;save(server,state);
-     }
+    String id=player.getUuidAsString();boolean inside=inStart(player);
+    if(state.rearmAfterExit&&!state.waitingExit.contains(id)&&inside){state.waitingExit.add(id);save(server,state);}
+    if(!inside){
+     state.inside.remove(id);
+     if(state.waitingExit.remove(id)){state.rearmAfterExit=false;save(server,state);}
      continue;
     }
-    // Speak on the actual approach bridge, not at the interior map anchor.
-    if(close(player,BRIDGE,5)||close(player,DOOR,5)){
+    boolean entered=state.inside.add(id);
+    if(entered&&!state.waitingExit.contains(id)){
      next(server,state,1);speak(server,"Холодно блять, зайду чтоль к рыбаку, узнаю че да как у него");return;
     }
    }
-   if(state.stage==1&&close(player,DOOR,3)){
+   if(state.stage==1&&at(player,DOOR)&&lookingAt(player,DOOR,true)){
     // ElectricDoors or another mod can consume a locked-door use packet.
     // Proximity is the reliable trigger: an impossible successful opening
     // is never required to continue the chapter.
@@ -253,22 +249,18 @@ public final class LakeStory {
    if(state.stage==2&&close(player,HOME_GEN,4)){
     next(server,state,3);speak(server,"Ну что за напасть ебаная, ладно может все не так плохо");return;
    }
-   if(state.stage==4&&close(player,HOME_PANEL,2)){
-    // Panel interaction can be intercepted by the block; proximity still works.
-    next(server,state,5);speak(server,"Кажись придется идти на лесопилку, чтож..");goal(server,"Добраться до лесопилки");return;
-   }
-   if(state.stage==5&&close(player,MILL_ENTRY,12)){
+   if(state.stage==5&&close(player,MILL_ENTRY,4)){
     next(server,state,6);
     world.playSound(null,new BlockPos(8378,73,8420),PowerDevices.OLD_CREAK,SoundCategory.BLOCKS,.8f,.83f);
     speak(server,"Что...");goal(server,"Восстановить электроснабжение");return;
    }
-   if(state.stage==6&&close(player,MILL_PANEL,3)){
+   if(state.stage==6&&at(player,MILL_PANEL)&&lookingAt(player,MILL_PANEL,false)){
     next(server,state,8);speak(server,"Ага, теперь ясно, надо включить резервный источник питания, и все должно заработать, осталось только его найти, блять");return;
    }
    if(state.stage==8){
     DeviceEntity gen=device(world,RESERVE);
-    if(gen!=null&&gen.active()){
-     next(server,state,9);activateSawmill(server,state,world);ageHouse(server,state,world);
+    if(gen!=null&&gen.active()&&GridManager.lakeReserveBound(server)&&GridManager.networkPowered(server,"circuit_3")){
+     next(server,state,9);ageHouse(server,state,world);
      speak(server,"Заебись");goal(server,"Вернуться к дому");return;
     }
    }
@@ -288,17 +280,18 @@ public final class LakeStory {
   speak(server,"Че за хуйня? у него электрическая дверь чтоль.. надо включить генератор, только где он.....");
   goal(server,"Найти генератор");
  }
+ private static boolean lookingAt(ServerPlayerEntity player,BlockPos pos,boolean door){
+  var hit=player.raycast(3,0,false);
+  return hit instanceof net.minecraft.util.hit.BlockHitResult block&&
+   (block.getBlockPos().equals(pos)||(door&&block.getBlockPos().equals(pos.up())));
+ }
  private static void used(ServerPlayerEntity player,ServerWorld world,BlockPos pos){
   MinecraftServer server=player.getServer();State state=STATES.get(server);
   if(state==null||!state.enabled||player.isSpectator()||!world.getRegistryKey().equals(OVERWORLD))return;
   if(state.stage==1&&sameDoor(pos)&&at(player,DOOR)){
    enterLockedDoor(server,state);return;
   }
-  if(state.stage==3&&pos.equals(HOME_GEN)&&at(player,HOME_GEN)){
-   world.playSound(null,HOME_GEN,PowerDevices.OLD_GEN_FAIL,SoundCategory.BLOCKS,1.1f,.94f);
-   next(server,state,4);speak(server,"Мда блять");return;
-  }
-  if(state.stage==4&&pos.equals(HOME_PANEL)&&at(player,HOME_PANEL)){
+  if(LakeStoryPolicy.afterPanel(state.stage,state.homeAttempted)==5&&pos.equals(HOME_PANEL)&&at(player,HOME_PANEL)){
    next(server,state,5);speak(server,"Кажись придется идти на лесопилку, чтож..");goal(server,"Добраться до лесопилки");return;
   }
   if(state.stage==6&&pos.equals(MILL_PANEL)&&at(player,MILL_PANEL)){
@@ -330,7 +323,7 @@ public final class LakeStory {
    if(state.decayApplied&&world.getBlockState(pos).isOf(Blocks.COBWEB))world.setBlockState(pos,Blocks.AIR.getDefaultState(),Block.NOTIFY_ALL);
   }
   DeviceEntity reserve=device(world,RESERVE);
-  if(reserve!=null&&reserve.kind()==3){reserve.emergencyStop();reserve.fuel=ONE_CAN*2;reserve.sync();}
+  if(reserve!=null&&reserve.kind()==3){reserve.emergencyStop();reserve.sync();}
   DeviceEntity local=device(world,HOME_GEN);
   if(local!=null&&local.kind()==3){local.emergencyStop();local.fuel=0;local.sync();}
   DeviceEntity panel=device(world,HOME_PANEL);
@@ -338,7 +331,7 @@ public final class LakeStory {
   DeviceEntity oldmill=device(world,MILL_GEN);
   if(oldmill!=null&&oldmill.kind()==3&&state.millActivated){
    oldmill.emergencyStop();
-   if(state.millSnapshotValid){oldmill.fuel=state.millFuelBefore;if(state.millWasRunning)oldmill.setActive(true);}
+   if(state.millSnapshotValid){oldmill.fuel=state.millFuelBefore;}
    oldmill.sync();
   }
   DeviceEntity millPanel=device(world,MILL_PANEL);
@@ -348,11 +341,14 @@ public final class LakeStory {
   }
   state.stage=0;state.enabled=true;state.localPrepared=false;
   state.millActivated=false;state.millSnapshotValid=false;state.decayApplied=false;
-  state.finalSoundAt=0;state.rearmAfterExit=true;
+  state.finalSoundAt=0;state.rearmAfterExit=false;
+  state.homeFueled=false;state.homeAttempted=false;state.homePulls=0;
+  state.waitingExit.clear();state.inside.clear();
+  for(ServerPlayerEntity p:server.getPlayerManager().getPlayerList())if(inStart(p)){state.waitingExit.add(p.getUuidAsString());state.inside.add(p.getUuidAsString());}
   save(server,state);GridManager.refresh(server);
   for(ServerPlayerEntity p:server.getPlayerManager().getPlayerList())
    ServerPlayNetworking.send(p,new LakeStoryPackets.Story(LakeStoryPackets.RESET,""));
-  source.sendFeedback(()->Text.literal("[Whiteout] Тьма у озера: сцена, задания, декорации и генераторы сброшены. Выйди из района дома и снова подойди по мостику."),false);
+  source.sendFeedback(()->Text.literal("[Whiteout] Тьма у озера: сцена, задания, декорации и генераторы сброшены. Выйди из зоны 8381 72 8366 ±3 и снова войди на мостик."),false);
   return 1;
  }
  public static void register(){
@@ -376,6 +372,7 @@ public final class LakeStory {
    }
   });
   UseBlockCallback.EVENT.register((player,world,hand,hit)->{
+   if(blocked(world,hit.getBlockPos()))return ActionResult.SUCCESS;
    if(!world.isClient&&hand==Hand.MAIN_HAND&&player instanceof ServerPlayerEntity serverPlayer&&world instanceof ServerWorld serverWorld){
     used(serverPlayer,serverWorld,hit.getBlockPos());
    }

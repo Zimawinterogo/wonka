@@ -71,6 +71,7 @@ public final class ElectricDoors {
  }
  public static boolean locked(ServerWorld world,BlockPos target){
   BlockPos pos=lower(world,target);
+  if(LakeStory.cabinLocked(world,pos))return true;
   String network=data(world.getServer()).doors.get(key(world,pos));
   return network!=null&&supported(world.getBlockState(pos))&&!GridManager.networkPowered(world.getServer(),network);
  }

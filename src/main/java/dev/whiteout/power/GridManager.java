@@ -345,6 +345,11 @@ public final class GridManager {
  }
  public static boolean diagnosticInvalidNetworks(MinecraftServer server){return networks(server).error!=null;}
  /** Read-only circuit access for wall switches and power-dependent doors. */
+ static boolean lakeReserveBound(MinecraftServer server){
+  Config c=networks(server).grids.get("circuit_3");
+  return c!=null&&healthy(c)&&"minecraft:overworld".equals(c.dimension)&&c.generatorBound&&c.panelBound
+   &&c.generator().equals(new BlockPos(8375,76,8414))&&c.panel().equals(new BlockPos(8402,72,8392));
+ }
  public static boolean networkPowered(MinecraftServer s,String id){
   Config c=MAIN.equals(id)?get(s):networks(s).grids.get(id);
   if(c==null||!healthy(c))return false;
@@ -580,6 +585,7 @@ public final class GridManager {
   return changed;
  }
  private static boolean powered(MinecraftServer s,Config c){
+  Boolean lake=LakeStory.circuitPower(s,c);if(lake!=null)return healthy(c)&&lake;
   return healthy(c)&&GridStatePolicy.supplied(c.panelBound,c.generatorBound,c.panelObserved,c.generatorObserved,
     c.panelFuse,c.panelBurnt,c.generatorRunning,c.generatorFueled,c.burntPending,c.generatorStopPending) && (c.flickerEnd==0|| (world(s,c.dimension)!=null&&world(s,c.dimension).getTime()>=c.flickerEnd));
  }

@@ -36,6 +36,7 @@ public final class DeviceEntity extends BlockEntity {
  public boolean active(){return getCachedState().get(DeviceBlock.ACTIVE);}
  public static void tick(World w,BlockPos p,BlockState s,DeviceEntity e){
   if(w.isClient){clientTicker.accept(e);return;}
+  if(LakeStory.blocked(w,p)||LakeStory.brokenHome(w,p)){if(e.active())e.emergencyStop();}
   if(e.kind()==0||e.kind()==3){
    if(e.active()){
     if(e.fuel>0)e.fuel--;
@@ -72,6 +73,7 @@ public final class DeviceEntity extends BlockEntity {
   }
  }
  void setActive(boolean active){
+  if(active&&(LakeStory.blocked(world,pos)||LakeStory.brokenHome(world,pos)))return;
   if(active()==active)return;
   world.setBlockState(pos,getCachedState().with(DeviceBlock.ACTIVE,active),3);
   world.updateNeighborsAlways(pos,getCachedState().getBlock());sync();
@@ -84,7 +86,7 @@ public final class DeviceEntity extends BlockEntity {
  private void message(PlayerEntity p,String key,Object... args){p.sendMessage(Text.translatable("message.whiteout."+key,args),true);}
  private void give(PlayerEntity p,ItemStack stack){if(!p.giveItemStack(stack))p.dropItem(stack,false);}
  public void interact(ServerPlayerEntity p,Hand hand,BlockHitResult hit){
-  if(p.isSpectator()||p.squaredDistanceTo(pos.toCenterPos())>36)return;
+  if(LakeStory.blocked(world,pos)||p.isSpectator()||p.squaredDistanceTo(pos.toCenterPos())>36)return;
   ItemStack held=p.getStackInHand(hand);
   if(kind()==2){
    Vec3d v=hit.getPos().subtract(pos.getX()+.5,pos.getY(),pos.getZ()+.5);
@@ -112,7 +114,7 @@ public final class DeviceEntity extends BlockEntity {
   }
   if(held.isOf(PowerDevices.FUEL)){
    if(fuel>MAX_FUEL-CAN_TICKS){message(p,"tank_full");return;}
-   fuel+=CAN_TICKS;if(!p.isCreative()){held.decrement(1);give(p,new ItemStack(PowerDevices.EMPTY_CAN));}sync();GridManager.refresh(p.getServer());sound(PowerDevices.CLICK,.65f);message(p,"fuel_added",fuel/1200);return;
+   fuel+=CAN_TICKS;if(!p.isCreative()){held.decrement(1);give(p,new ItemStack(PowerDevices.EMPTY_CAN));}sync();GridManager.refresh(p.getServer());sound(PowerDevices.CLICK,.65f);message(p,"fuel_added",fuel/1200);LakeStory.refueled(this);return;
   }
   if(active()){
    if(p.isSneaking()&&held.isEmpty()){setActive(false);stopSound();message(p,"generator_off");}
@@ -126,9 +128,16 @@ public final class DeviceEntity extends BlockEntity {
  private void send(ServerPlayerEntity p,int status){ServerPlayNetworking.send(p,new PowerNetwork.Starter(pos,epoch,progress,status));}
  public void cancel(ServerPlayerEntity p){if(p.getUuid().equals(operator))operator=null;}
  public void pull(ServerPlayerEntity p){
+  if(LakeStory.blocked(world,pos)||p.isSpectator()||!p.isAlive())return;
   long now=world.getTime();
   if((kind()!=0&&kind()!=3)||!p.getUuid().equals(operator)||now>expires||active()||fuel<=0||p.squaredDistanceTo(pos.toCenterPos())>36)return;
   if(now<epoch){send(p,5);return;}
+  if(LakeStory.homePull(this)){
+   sound(PowerDevices.OLD_GEN_FAIL,1.1f,.94f);
+   epoch=now+15;
+   if(LakeStory.homeAttemptComplete(this)){operator=null;send(p,4);}else send(p,2);
+   return;
+  }
   boolean worn=kind()==3;boolean ok=worn?WornStarterLogic.hit(now-epoch,progress):StarterLogic.hit(now-epoch,progress);progress=worn?WornStarterLogic.next(progress,ok):StarterLogic.next(progress,ok);
   if(worn){
    // Old generator: each pull plays its own starter sample (rope + turning engine), never the shared pull/fail sounds.
