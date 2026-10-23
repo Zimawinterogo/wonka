@@ -359,6 +359,32 @@ public final class GridManager {
   if(c==null)return List.of();List<String> result=new ArrayList<>();
   for(Fixture f:c.lamps)result.add(address(f.dimension,f.pos()));return result;
  }
+ /** Lake chapter only: safely migrate its known named circuit, never rewrite an unrelated circuit. */
+ public static boolean relocateLakeReserve(MinecraftServer server,BlockPos oldPos,BlockPos newPos){
+  NetworkStore store=networks(server);if(store.error!=null)return false;
+  Config grid=store.grids.get("circuit_3");
+  if(grid==null||!healthy(grid)||!grid.generatorBound||!"minecraft:overworld".equals(grid.dimension))return false;
+  if(grid.generator().equals(newPos))return true;
+  if(!grid.generator().equals(oldPos))return false;
+  for(Config other:all(server))if(other!=grid&&occupied(other,grid.dimension,newPos))return false;
+  grid.generatorX=newPos.getX();grid.generatorY=newPos.getY();grid.generatorZ=newPos.getZ();
+  grid.generatorObserved=false;grid.generatorRunning=false;grid.generatorFueled=false;grid.cachedPower=null;
+  persist(server,grid);refresh(server);
+  return true;
+ }
+ /** Add the single preflighted emergency lamp to the named lake-cabin circuit. */
+ public static boolean linkLakeEmergencyLamp(MinecraftServer server,BlockPos pos){
+  NetworkStore store=networks(server);if(store.error!=null)return false;
+  Config grid=store.grids.get("circuit_3");
+  if(grid==null||!healthy(grid)||!"minecraft:overworld".equals(grid.dimension))return false;
+  for(Fixture f:grid.lamps)if(f.at(grid.dimension,pos))return true;
+  for(Config other:all(server))if(other!=grid&&occupied(other,grid.dimension,pos))return false;
+  Fixture lamp=new Fixture();lamp.dimension=grid.dimension;
+  lamp.x=pos.getX();lamp.y=pos.getY();lamp.z=pos.getZ();
+  lamp.original="whiteout:emergency_lamp";lamp.vanilla=false;lamp.properties.put("lit","false");
+  grid.lamps.add(lamp);grid.cachedPower=null;persist(server,grid);refresh(server);
+  return true;
+ }
  public static void refreshSwitches(MinecraftServer s){
   for(Config c:all(s))c.cachedPower=null;
   refresh(s);

@@ -66,6 +66,7 @@ public final class PowerDevices implements ModInitializer {
   GridManager.register();
   WhiteoutWorldState.register();
   CrisisRuntime.register();
+  LakeStory.register();
   PowerSwitches.register();
   ElectricDoors.register();
   AutoClosingDoors.register();

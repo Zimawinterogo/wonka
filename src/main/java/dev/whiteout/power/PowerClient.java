@@ -82,6 +82,7 @@ public final class PowerClient implements ClientModInitializer {
    else DialogueManager.openDirector(v.id(),140);
   }));
   StoryDialogueHud.register();
+  LakeStoryClient.register();
   net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler,mc)->StoryPortraits.clearWorld());
   ClientPlayNetworking.registerGlobalReceiver(PowerNetwork.Starter.ID,(v,c)->c.client().execute(()->{
    if(c.client().currentScreen instanceof StarterScreen s&&s.pos.equals(v.pos()))s.update(v);
