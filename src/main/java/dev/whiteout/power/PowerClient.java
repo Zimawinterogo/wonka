@@ -79,7 +79,7 @@ public final class PowerClient implements ClientModInitializer {
    if(c.client().player!=null)c.client().setScreen(new DialogueCatalogScreen());
   }));
   ClientPlayNetworking.registerGlobalReceiver(PowerNetwork.PlayDialogue.ID,(v,c)->c.client().execute(()->{
-   if(c.client().player==null||v.id()==null||!v.id().matches("[a-zA-Z0-9_:-]{1,64}"))return;
+   if(c.client().player==null||v.id()==null||(!v.id().matches("[a-zA-Z0-9_:-]{1,64}")&&!DialogueRoute.reference(v.id())))return;
    if(v.signal())dev.whiteout.client.director.DirectorTriggerManager.signal("wdlg:"+v.id());
    else DialogueManager.openDirector(v.id(),140);
   }));

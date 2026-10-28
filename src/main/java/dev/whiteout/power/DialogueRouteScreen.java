@@ -14,7 +14,7 @@ public final class DialogueRouteScreen extends SharpScreen {
  private int offset,selected;
  private String error="";
  public DialogueRouteScreen(Screen parent){super(text("title"));this.parent=parent;}
- public void update(DialogueRouteNetwork.EditorData value){data=value;error=value.invalid()?"corrupt":value.error();clearAndInit();}
+ public void update(DialogueRouteNetwork.EditorData value){data=value;error=!value.error().isEmpty()?value.error():value.invalid()?"corrupt":"";clearAndInit();}
  long revision(){return data==null?0:data.data().revision();}
  private List<DialogueRoute> routes(){return data==null?List.of():data.data().routes();}
  private DialogueRoute chosen(){return routes().isEmpty()?null:routes().get(selected);}

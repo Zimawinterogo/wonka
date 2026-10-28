@@ -29,9 +29,9 @@ public final class DialogueRouteNetwork {
   public static final PacketCodec<RegistryByteBuf,Result> CODEC=PacketCodec.ofStatic((b,p)->{b.writeLong(p.token);b.writeString(p.selected,128);b.writeString(p.fallback,128);b.writeString(p.error,32);},b->new Result(b.readLong(),b.readString(128),b.readString(128),b.readString(32)));
   public Id<? extends CustomPayload> getId(){return ID;}
  }
- public record Edit(String action,String json,long revision) implements CustomPayload {
+ public record Edit(String action,String json,long revision,long token) implements CustomPayload {
   public static final Id<Edit> ID=new Id<>(PowerDevices.id("route_edit"));
-  public static final PacketCodec<RegistryByteBuf,Edit> CODEC=PacketCodec.ofStatic((b,p)->{b.writeString(p.action,8);b.writeString(p.json,12000);b.writeLong(p.revision);},b->new Edit(b.readString(8),b.readString(12000),b.readLong()));
+  public static final PacketCodec<RegistryByteBuf,Edit> CODEC=PacketCodec.ofStatic((b,p)->{b.writeString(p.action,8);b.writeString(p.json,12000);b.writeLong(p.revision);b.writeLong(p.token);},b->new Edit(b.readString(8),b.readString(12000),b.readLong(),b.readLong()));
   public Id<? extends CustomPayload> getId(){return ID;}
  }
  public record Part(int index,int total,String json) implements CustomPayload {
@@ -39,7 +39,7 @@ public final class DialogueRouteNetwork {
   public static final PacketCodec<RegistryByteBuf,Part> CODEC=PacketCodec.ofStatic((b,p)->{b.writeVarInt(p.index);b.writeVarInt(p.total);b.writeString(p.json,SnapshotChunks.SIZE);},b->new Part(b.readVarInt(),b.readVarInt(),b.readString(SnapshotChunks.SIZE)));
   public Id<? extends CustomPayload> getId(){return ID;}
  }
- public record EditorData(DialogueRouteStore.Data data,boolean invalid,String error){}
+ public record EditorData(DialogueRouteStore.Data data,boolean invalid,String error,long token){}
  static DialogueRouteStore store(MinecraftServer server){return STORES.computeIfAbsent(server,s->new DialogueRouteStore(s.getSavePath(WorldSavePath.ROOT).resolve("whiteout-dialogue-routes.json")));}
  public static void register(){
   PayloadTypeRegistry.playC2S().register(Resolve.ID,Resolve.CODEC);PayloadTypeRegistry.playC2S().register(Edit.ID,Edit.CODEC);
@@ -65,7 +65,7 @@ public final class DialogueRouteNetwork {
   ServerPlayNetworking.send(player,result);
  }
  private static void edit(ServerPlayerEntity player,Edit request){
-  if(!player.hasPermissionLevel(2)){sendEditor(player,new EditorData(new DialogueRouteStore.Data(1,0,List.of()),true,"permission"));return;}
+  if(!player.hasPermissionLevel(2)){sendEditor(player,new EditorData(new DialogueRouteStore.Data(1,0,List.of()),true,"permission",request.token));return;}
   var store=store(player.getServer());String error="";
   try{
    switch(request.action){
@@ -79,11 +79,11 @@ public final class DialogueRouteNetwork {
     default->throw new IllegalArgumentException();
    }
   }catch(Exception ex){error=store.invalid()?"corrupt":request.revision!=store.snapshot().revision()?"conflict":"duplicate".equals(ex.getMessage())?"duplicate":"save_failed";}
-  sendEditor(player,new EditorData(store.snapshot(),store.invalid(),error));
+  sendEditor(player,new EditorData(store.snapshot(),store.invalid(),error,request.token));
  }
  private static void sendEditor(ServerPlayerEntity player,EditorData value){
   var parts=SnapshotChunks.split(GSON.toJson(value));
-  if(parts.isEmpty())parts=List.of(GSON.toJson(new EditorData(new DialogueRouteStore.Data(1,0,List.of()),true,"size")));
+  if(parts.isEmpty())parts=List.of(GSON.toJson(new EditorData(new DialogueRouteStore.Data(1,0,List.of()),true,"size",value.token)));
   for(int i=0;i<parts.size();i++)ServerPlayNetworking.send(player,new Part(i,parts.size(),parts.get(i)));
  }
 }

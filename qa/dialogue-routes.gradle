@@ -1,0 +1,23 @@
+// Pass together with -I qa/foundation.gradle for the existing unpacked base fixture.
+gradle.projectsEvaluated {
+ def p=gradle.rootProject
+ p.tasks.register('compileRouteProbes',JavaCompile) {
+  dependsOn 'classes'
+  source p.fileTree('tests') { include 'DialogueRouteBootstrap.java';include 'DialogueRouteClientProbe.java';include 'DialogueRouteServerProbe.java' }
+  classpath=p.sourceSets.main.output+p.sourceSets.main.compileClasspath
+  destinationDirectory=p.layout.buildDirectory.dir('route-probes')
+  javaCompiler=p.javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }
+ }
+ ['client','server'].each { side ->
+  p.tasks.register('routeProbe'+side.capitalize(),JavaExec) {
+   dependsOn 'compileRouteProbes','prepareFoundationBase'
+   classpath=p.files(p.layout.buildDirectory.dir('route-probes'))+p.sourceSets.main.output+
+    p.sourceSets.main.compileClasspath.filter { !it.name.startsWith('Whiteout-3.4.2') }+p.files(p.layout.buildDirectory.dir('foundation-base'))+p.configurations.mappingsFinal
+   mainClass='DialogueRouteBootstrap';args side
+   systemProperty 'fabric.development','true'
+   systemProperty 'fabric.gameMappingNamespace','named'
+   javaLauncher=p.javaToolchains.launcherFor { languageVersion=JavaLanguageVersion.of(21) }
+   doFirst { workingDir=p.layout.buildDirectory.dir('route-probe-'+side).get().asFile;workingDir.mkdirs() }
+  }
+ }
+}

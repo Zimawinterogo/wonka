@@ -3,7 +3,7 @@ import org.objectweb.asm.tree.*
 
 plugins { id 'fabric-loom' version '1.8.13' }
 loom { mixin { defaultRefmapName = 'whiteout-visual-refmap.json' } }
-version = '3.12.19'
+version = '3.13.0'
 group = 'dev.whiteout'
 base { archivesName = 'whiteout-power' }
 repositories { mavenCentral() }
@@ -561,7 +561,7 @@ tasks.named('compileJava') { dependsOn 'verifySharpScreens' }
 tasks.named('build') { dependsOn 'assembleWhiteout' }
 
 // All executable regressions use the actual compiled production classes.
-def regressions = ['PassportRulesTest','LakeStoryPolicyTest','LakeDialogueLinesTest','LakePersistenceTest','WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewFeaturesTest',
+def regressions = ['DialogueRouteTest','PassportRulesTest','LakeStoryPolicyTest','LakeDialogueLinesTest','LakePersistenceTest','WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewFeaturesTest',
  'GridStatePolicyTest','ForestCandidatePolicyTest','AuditRegressionTest','BuildingAtmosphereTest',
  'BackupLampPolicyTest','MultiNetworkRulesTest','SnapshotChunksTest','ZoneFolderOrderTest',
  'ZoneIdBatcherTest','ZoneMusicContinuityTest','GeneratorLifecycleTest','DiagnosticDataTest','LegacyPersistenceTest','GeneratorMeshTest','AuditHardeningTest','StoreSafetyTest','BackpackPolicyTest','BackpackSyncTest','BackpackModelTest','WeatherDepthTimingTest']

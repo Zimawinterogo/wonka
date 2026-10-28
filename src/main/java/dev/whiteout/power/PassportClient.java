@@ -36,6 +36,12 @@ public final class PassportClient {
   try{
    var entries=DialogueCatalog.entries();Set<String> known=new HashSet<>(),used=new HashSet<>(),scenes=new HashSet<>();
    for(var e:entries)known.add(e.id());
+   for(var e:b.build().entries())if(e.section().equals("dialogues")&&e.values().containsKey("route")){
+    known.add(DialogueRoute.PREFIX+e.values().get("route"));
+    e.values().forEach((key,id)->{if(key.equals("fallback")||key.startsWith("variant_")){
+     used.add(id);if(!known.contains(id))b.issue(WARN,"invalid_trigger",e.id()+" -> "+id,null);
+    }});
+   }
    for(var scene:DirectorLibrary.all()){
     scenes.add(scene.id);b.entry("dialogues","scene: "+scene.id,null,Map.of("source","client"));
     if(scene.events==null){b.issue(WARN,"invalid_trigger",scene.id,null);continue;}

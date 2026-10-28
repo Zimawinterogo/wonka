@@ -16,10 +16,10 @@ public final class DialogueRouteClient {
  private static final SnapshotChunks.Receiver EDITOR=new SnapshotChunks.Receiver();
  private static final Gson GSON=new Gson();
  private static Object world;
- private static long tick,sentAt;
+ private static long tick,sentAt,editorRequest;
  private static boolean bypass,waiting;
  private static DialogueRouteNetwork.Result ready;
- static DialogueRouteNetwork.EditorData editorData=new DialogueRouteNetwork.EditorData(new DialogueRouteStore.Data(1,0,java.util.List.of()),false,"");
+ static DialogueRouteNetwork.EditorData editorData=new DialogueRouteNetwork.EditorData(new DialogueRouteStore.Data(1,0,java.util.List.of()),false,"",0);
  private DialogueRouteClient(){}
  public static Text text(String key,Object... args){return Text.translatable("route.whiteout."+key,args);}
  public static boolean isRoute(String id){return id!=null&&id.startsWith(DialogueRoute.PREFIX);}
@@ -33,13 +33,13 @@ public final class DialogueRouteClient {
   ClientPlayNetworking.registerGlobalReceiver(DialogueRouteNetwork.Part.ID,(p,c)->c.client().execute(()->{
    try{
     String json=EDITOR.accept(p.index(),p.total(),p.json());if(json==null)return;
-    var data=GSON.fromJson(json,DialogueRouteNetwork.EditorData.class);DialogueRouteStore.validate(data.data());editorData=data;
+    var data=GSON.fromJson(json,DialogueRouteNetwork.EditorData.class);if(data.token()!=editorRequest)return;DialogueRouteStore.validate(data.data());editorData=data;
     if(c.client().currentScreen instanceof DialogueRouteScreen s)s.update(data);
     else if(c.client().currentScreen instanceof DialogueRouteEditScreen s)s.result(data);
    }catch(RuntimeException ex){EDITOR.clear();message("unavailable");}
   }));
  }
- private static void clear(){QUEUE.clear();EDITOR.clear();waiting=false;ready=null;world=null;editorData=new DialogueRouteNetwork.EditorData(new DialogueRouteStore.Data(1,0,java.util.List.of()),false,"");}
+ private static void clear(){QUEUE.clear();EDITOR.clear();waiting=false;ready=null;world=null;editorRequest++;editorData=new DialogueRouteNetwork.EditorData(new DialogueRouteStore.Data(1,0,java.util.List.of()),false,"",0);}
  public static boolean intercept(String id,int duration){
   if(bypass)return false;
   if(!isRoute(id)&&QUEUE.empty())return false;
@@ -80,7 +80,7 @@ public final class DialogueRouteClient {
  private static void message(String key){var mc=MinecraftClient.getInstance();if(mc.player!=null)mc.player.sendMessage(text(key),false);}
  public static void open(Screen parent){var mc=MinecraftClient.getInstance();mc.setScreen(new DialogueRouteScreen(parent));edit("list","",0);}
  static void edit(String action,String json,long revision){
-  if(ClientPlayNetworking.canSend(DialogueRouteNetwork.Edit.ID))ClientPlayNetworking.send(new DialogueRouteNetwork.Edit(action,json,revision));else message("unavailable");
+  if(ClientPlayNetworking.canSend(DialogueRouteNetwork.Edit.ID))ClientPlayNetworking.send(new DialogueRouteNetwork.Edit(action,json,revision,++editorRequest));else message("unavailable");
  }
  static void save(DialogueRoute route,long revision,boolean create){edit(create?"create":"save",DialogueRouteStore.validateWire(route),revision);}
 }

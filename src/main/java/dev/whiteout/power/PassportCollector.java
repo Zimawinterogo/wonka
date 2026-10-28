@@ -70,6 +70,13 @@ public final class PassportCollector {
    loaded(b,"bolt",world(server,p.dimension()),p);
   }
   zones(server,b);
+  var routes=DialogueRouteNetwork.store(server);
+  if(routes.invalid())b.issue(ERROR,"invalid_config","dialogue routes",null);
+  for(var route:routes.snapshot().routes()){
+   Map<String,String> references=new LinkedHashMap<>();references.put("route",route.id());references.put("fallback",route.fallback());
+   for(int i=0;i<route.variants().size();i++)references.put("variant_"+i,route.variants().get(i).dialogue());
+   b.entry("dialogues","route: "+route.id(),null,references);
+  }
   b.issue(INFO,"client_dialogues","",null);
   b.issue(INFO,"summary",snapshot.rows().size()+" diagnostic rows",null);
   return b.build();

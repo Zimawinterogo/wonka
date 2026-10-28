@@ -27,10 +27,8 @@ public final class DialogueRouteConditions {
    }
    case STORY->{
     var store=Store.get(server);
-    if(store.error!=null||store.data.storyVariables==null||!store.data.storyVariables.containsKey(condition.target()))return Truth.UNKNOWN;
-    var actual=store.data.storyVariables.get(condition.target());var check=condition.storyCondition();
-    if(actual==null||actual.type!=check.value.type)return Truth.UNKNOWN;
-    result=Truth.of(check.test(store.data.storyVariables));
+    if(store.error!=null)return Truth.UNKNOWN;
+    result=condition.storyTruth(store.data.storyVariables);
    }
    default->result=Truth.UNKNOWN;
   }

@@ -10,6 +10,7 @@ import dev.whiteout.power.WinterCrisisConditions.Truth;
 public record DialogueRoute(String id,String fallback,List<Variant> variants) {
  public static final String PREFIX="whiteout-route:";
  public static final int MAX_ROUTES=64,MAX_VARIANTS=16;
+ public static boolean reference(String value){return value!=null&&value.startsWith(PREFIX)&&value.substring(PREFIX.length()).matches("[a-z0-9_-]{1,64}");}
  public enum Type { NETWORK,GENERATOR,WEATHER_ZONE,BLIZZARD,STORY }
  public record Condition(Type type,String target,String dimension,int x,int y,int z,boolean expected,String value,StoryRules.Operator operator) {
   public void validate(){
@@ -24,6 +25,12 @@ public record DialogueRoute(String id,String fallback,List<Variant> variants) {
   }
   public StoryRules.Condition storyCondition(){
    StoryRules.Condition c=new StoryRules.Condition();c.variable=target;c.operator=operator;c.value=StoryRules.parse(value);return c;
+  }
+  public Truth storyTruth(Map<String,StoryRules.Value> variables){
+   if(variables==null||!variables.containsKey(target))return Truth.UNKNOWN;
+   var actual=variables.get(target);var check=storyCondition();
+   if(actual==null||actual.type!=check.value.type)return Truth.UNKNOWN;
+   return Truth.of(check.test(variables));
   }
  }
  public record Variant(String dialogue,int priority,Condition condition){}
