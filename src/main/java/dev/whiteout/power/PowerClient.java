@@ -53,6 +53,7 @@ public final class PowerClient implements ClientModInitializer {
   dev.whiteout.power.barricade.BarricadeModels.register();
   EnvironmentClient.initialize();
   PowerDiagnosticsClient.register();
+  PassportClient.register();
   GlassFrostOverlay.register();
   WeatherDepth.register();
   GroundSnow.initialize();

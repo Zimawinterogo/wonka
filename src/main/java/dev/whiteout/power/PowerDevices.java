@@ -63,6 +63,7 @@ public final class PowerDevices implements ModInitializer {
   WorldAtmosphere.register();
   PowerNetwork.register();
   PowerDiagnostics.register();
+  PassportNetwork.register();
   GridManager.register();
   WhiteoutWorldState.register();
   CrisisRuntime.register();

@@ -69,6 +69,14 @@ public final class DoorBolts implements ModInitializer {
  }
  private static final class Row{String d;int x,y,z;boolean inner,locked;}
  private static final class FileData{List<Row> bolts=new ArrayList<>();}
+ public record DiagnosticBolt(String dimension,int x,int y,int z,boolean inner,boolean locked){}
+ public static boolean diagnosticInvalid(MinecraftServer server){return store(server).invalid;}
+ public static List<DiagnosticBolt> diagnosticEntries(MinecraftServer server){
+  List<DiagnosticBolt> result=new ArrayList<>();
+  store(server).dims.forEach((dim,entries)->entries.forEach((key,bolt)->{
+   BlockPos p=BlockPos.fromLong(key);result.add(new DiagnosticBolt(dim,p.getX(),p.getY(),p.getZ(),bolt.inner(),bolt.locked()));
+  }));return List.copyOf(result);
+ }
 
  private static Path file(MinecraftServer s){return s.getSavePath(WorldSavePath.ROOT).resolve("whiteout-door-bolts.json");}
  private static Store store(MinecraftServer server){

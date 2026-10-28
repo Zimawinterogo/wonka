@@ -64,6 +64,7 @@ public final class ZoneFolders {
   if(!save(s)){DATA.put(s,old);throw new IllegalStateException("Ошибка сохранения папок");}syncAll(s);
  }
  public static Map<String,String> diagnosticAssignments(MinecraftServer server){return Map.copyOf(data(server).assigned);}
+ public static boolean diagnosticInvalid(MinecraftServer server){return data(server).invalid;}
  private static boolean valid(String s){return s!=null&&!s.isBlank()&&s.length()<=32&&s.equals(s.strip())&&s.chars().noneMatch(Character::isISOControl);}
  private static boolean save(MinecraftServer s){
   Data d=data(s);if(d.invalid)return false;

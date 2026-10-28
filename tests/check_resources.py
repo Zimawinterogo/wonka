@@ -43,5 +43,9 @@ with zipfile.ZipFile(root/'base/Whiteout-3.4.2-1.21.1.jar') as z:
    rel=p.relative_to(r).as_posix()
    if rel in approved_item_overrides and rel in z.namelist():
     assert p.read_bytes()!=z.read(rel),f'expected redesigned texture for {rel}'
+   if rel in z.namelist() and rel.startswith('data/whiteout/') and rel.endswith('.json'):
+    # Match the assembler's semantic equality exception; changed loot remains forbidden.
+    assert json.loads(p.read_bytes())==json.loads(z.read(rel)),rel
+    continue
    assert rel not in z.namelist() or rel in approved_item_overrides or rel.startswith('assets/whiteout/blockstates/') or rel.startswith('assets/whiteout/models/') or (rel.startswith('assets/whiteout/sounds/music_slot_') and rel.endswith('.ogg')) or ((rel.startswith('assets/whiteout/sounds/') or rel.startswith('data/whiteout/')) and p.read_bytes()==z.read(rel)) or rel in ('assets/whiteout/shaders/snow.frag','assets/whiteout/shaders/winter.fsh') or rel in ('fabric.mod.json','assets/whiteout/sounds.json','assets/whiteout/lang/ru_ru.json','assets/whiteout/lang/en_us.json'),rel
 print('PASS',len(files),'JSON files; blockstates, models, sounds, locales and base-resource collision checks')

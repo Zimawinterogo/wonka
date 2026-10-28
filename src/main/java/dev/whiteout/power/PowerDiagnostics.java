@@ -59,7 +59,7 @@ public final class PowerDiagnostics {
  private static DiagnosticData.Detail status(String key,String value){return new DiagnosticData.Detail(key,value,true);}
  private static String key(String dim,BlockPos pos){return dim+":"+pos.asLong();}
  private static DeviceEntity device(ServerWorld world,BlockPos pos){return world!=null&&world.isChunkLoaded(pos)&&world.getBlockEntity(pos) instanceof DeviceEntity e?e:null;}
- private static DiagnosticData.Snapshot capture(ServerPlayerEntity player){
+ static DiagnosticData.Snapshot capture(ServerPlayerEntity player){
   var server=player.getServer();var configs=GridManager.diagnosticConfigs(server);
   List<DiagnosticData.Row> rows=new ArrayList<>();Set<String> devices=new HashSet<>();
   Map<String,String> owned=new HashMap<>();

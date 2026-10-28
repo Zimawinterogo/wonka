@@ -62,7 +62,11 @@ with ZipFile(r/f'build/release/Whiteout-{version}-1.21.1.jar') as z:
     for p in res.rglob('*'):
         if p.is_file():
             name=p.relative_to(res).as_posix()
-            if name not in merged:assert z.read(name)==p.read_bytes(),name
+            if name not in merged:
+                # Assembly preserves pinned base JSON bytes when checkout line endings differ.
+                if name.startswith('data/whiteout/') and name.endswith('.json'):
+                    assert json.loads(z.read(name))==json.loads(p.read_bytes()),name
+                else:assert z.read(name)==p.read_bytes(),name
     for lang in ('ru_ru','en_us'):
         local=json.loads((a/f'lang/{lang}.json').read_text(encoding='utf-8'))
         bundled=json.loads(z.read(f'assets/whiteout/lang/{lang}.json'))

@@ -35,6 +35,7 @@ public final class PowerDiagnosticsScreen extends SharpScreen {
   }
   addDrawableChild(ButtonWidget.builder(Text.literal("◀"),b->{page--;clearAndInit();}).dimensions(10,height-32,30,20).build()).active=page>0;
   addDrawableChild(ButtonWidget.builder(Text.literal("▶"),b->{page++;clearAndInit();}).dimensions(44,height-32,30,20).build()).active=(page+1)*size<rows.size();
+  addDrawableChild(ButtonWidget.builder(Text.translatable("passport.whiteout.title"),b->PassportClient.request()).dimensions(80,height-32,Math.max(50,width-280),20).build());
   refresh=addDrawableChild(ButtonWidget.builder(tr("refresh"),b->{refreshAt=System.currentTimeMillis();PowerDiagnosticsClient.refresh();}).dimensions(width-192,height-32,88,20).build());
   addDrawableChild(ButtonWidget.builder(tr("close"),b->close()).dimensions(width-98,height-32,88,20).build());
  }
