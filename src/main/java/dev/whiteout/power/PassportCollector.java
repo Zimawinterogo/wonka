@@ -107,6 +107,12 @@ public final class PassportCollector {
    "slammingDoors",""+a.slammingDoors,"radioStatic",""+a.radioStatic,"windowFrost",""+a.windowFrost,
    "tempOutdoorBlizzard",""+a.tempOutdoorBlizzard,"tempOutdoorNormal",""+a.tempOutdoorNormal));
   if(a.windMovement&&a.windStrengthPercent==0)b.issue(WARN,"zero_wind","world",null);
+  b.entry("atmosphere","door settings",null,Map.of("requiredPulls",""+a.doorRequiredPulls,"indoorFootprints",""+a.indoorFootprints));
+  for(String key:a.freezingDoors){
+   var p=parseDoor(key.replace(',',':'));var state=a.doorStates.get(key);
+   b.entry("atmosphere","freezing door: "+key,p,Map.of("coldTicks",state==null?"unknown":""+state.coldTicks,"attempts",state==null?"unknown":""+state.attempts));
+   if(p==null)b.issue(ERROR,"invalid_config",key,null);else loaded(b,key,world(s,p.dimension()),p);
+  }
   Set<String> references=new HashSet<>(a.oldShelters);references.addAll(a.oldSoundIntervals.keySet());references.addAll(a.mutedOldSoundZones);
   for(String id:references){
    PassportRules.reference(b,"atmosphere",id,ids,null);
