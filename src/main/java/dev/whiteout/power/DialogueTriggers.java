@@ -21,7 +21,7 @@ public final class DialogueTriggers {
   return candidate;
  }
  public static String bind(String script,Kind kind,MinecraftClient mc,int radius,boolean once,Entity npc){
-  if(DialogueManager.findById(script)==null)throw new IllegalArgumentException("Сначала сохрани диалог");
+  if(!DialogueRouteClient.isRoute(script)&&DialogueManager.findById(script)==null)throw new IllegalArgumentException("Сначала сохрани диалог");
   if(mc==null||mc.player==null||mc.world==null)throw new IllegalStateException("Мир не загружен");
   if(kind==Kind.NPC&&npc==null)throw new IllegalArgumentException("Наведись на NPC до открытия каталога");
   String sceneId=uniqueScene(script);
@@ -67,7 +67,7 @@ public final class DialogueTriggers {
   DirectorScene.Event e=scene.events.get(0);
   if(e==null||e.type!=DirectorScene.EventType.DIALOGUE||e.value==null)return false;
   // A deleted script does not turn into a camera-stealing Director scene.
-  if(DialogueManager.findById(e.value)==null)return true;
+  if(!DialogueRouteClient.isRoute(e.value)&&DialogueManager.findById(e.value)==null)return true;
   DialogueManager.openDirector(e.value,Math.max(80,e.durationTicks));
   return true;
  }

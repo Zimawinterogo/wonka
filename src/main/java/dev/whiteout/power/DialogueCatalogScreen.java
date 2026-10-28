@@ -27,14 +27,16 @@ public final class DialogueCatalogScreen extends SharpScreen {
   panelTop=(height-panelHeight)/2;
   int x=panelLeft+16,y=panelTop+39,w=panelWidth-32;
   rows=Math.max(2,Math.min(10,(panelHeight-178)/25));
-  search=new TextFieldWidget(textRenderer,x,y,w-100,20,Text.translatable("screen.whiteout.dialogues.search"));
+  search=new TextFieldWidget(textRenderer,x,y,w-200,20,Text.translatable("screen.whiteout.dialogues.search"));
   search.setMaxLength(120);
   search.setText(query);
   search.setChangedListener(value->{query=value;page=0;updateRows();});
   addDrawableChild(search);
   reload=addDrawableChild(ButtonWidget.builder(Text.translatable("screen.whiteout.dialogues.reload"),b->{
    DialogueManagerReload.reload();reloadItems();
-  }).dimensions(x+w-92,y,92,20).build());
+  }).dimensions(x+w-192,y,92,20).build());
+  addDrawableChild(ButtonWidget.builder(DialogueRouteClient.text("title"),b->DialogueRouteClient.open(this))
+   .dimensions(x+w-96,y,96,20).build());
   for(int i=0;i<rows;i++){
    final int row=i;
    ButtonWidget button=ButtonWidget.builder(Text.empty(),b->selectRow(row))

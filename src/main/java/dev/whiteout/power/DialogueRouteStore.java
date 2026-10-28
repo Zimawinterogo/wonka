@@ -23,7 +23,12 @@ public final class DialogueRouteStore {
  public static void validate(Data data){
   if(data==null||data.schema!=1||data.revision<0||data.revision==Long.MAX_VALUE||data.routes==null||data.routes.size()>DialogueRoute.MAX_ROUTES)throw new IllegalArgumentException("file");
   Set<String> ids=new HashSet<>();
-  for(var route:data.routes){if(route==null)throw new IllegalArgumentException("route");route.validate();if(!ids.add(route.id()))throw new IllegalArgumentException("duplicate");}
+  for(var route:data.routes){if(route==null)throw new IllegalArgumentException("route");route.validate();validateWire(route);if(!ids.add(route.id()))throw new IllegalArgumentException("duplicate");}
+ }
+ public static String validateWire(DialogueRoute route){
+  String json=GSON.toJson(route);
+  if(json.length()>12000||json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>24000)throw new IllegalArgumentException("size");
+  return json;
  }
  private static Data immutable(Data data){return new Data(data.schema,data.revision,List.copyOf(data.routes));}
  public Data snapshot(){return data;}

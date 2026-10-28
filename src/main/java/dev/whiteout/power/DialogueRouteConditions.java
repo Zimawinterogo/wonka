@@ -21,6 +21,7 @@ public final class DialogueRouteConditions {
    }
    case WEATHER_ZONE,BLIZZARD->{
     if(!player.getServerWorld().isChunkLoaded(player.getBlockPos()))return Truth.UNKNOWN;
+    if(condition.type()==DialogueRoute.Type.WEATHER_ZONE&&Store.get(server).data.zones.stream().noneMatch(z->z!=null&&condition.target().equals(z.id)))return Truth.UNKNOWN;
     result=observed(state.weather(player.getServerWorld(),player.getBlockPos()),w->condition.type()==DialogueRoute.Type.BLIZZARD?
      w.blizzard():w.weather().map(z->z.id().equals(condition.target())).orElse(false));
    }

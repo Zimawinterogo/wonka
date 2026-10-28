@@ -13,7 +13,7 @@ import net.minecraft.text.Text;
 
 /** One-click link to the original Director ENTER_BOX, INTERACT_ENTITY or SIGNAL triggers. */
 public final class DialogueTriggerScreen extends SharpScreen {
- private final DialogueCatalogScreen parent;
+ private final net.minecraft.client.gui.screen.Screen parent;
  private final String id;
  private final List<Entity> nearbyNpc;
  private int npcIndex=0;
@@ -25,7 +25,7 @@ public final class DialogueTriggerScreen extends SharpScreen {
  private String error="",success="";
  private static Text t(String key,Object... args){return Text.translatable("screen.whiteout.trigger."+key,args);}
  private static String tr(String key,Object... args){return t(key,args).getString();}
- public DialogueTriggerScreen(DialogueCatalogScreen parent,String id){
+ public DialogueTriggerScreen(net.minecraft.client.gui.screen.Screen parent,String id){
   super(Text.translatable("screen.whiteout.trigger.title"));this.parent=parent;this.id=id;
   MinecraftClient mc=MinecraftClient.getInstance();
   List<Entity> found=new ArrayList<>();

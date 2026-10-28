@@ -70,11 +70,15 @@ public final class DialogueRouteNetwork {
   try{
    switch(request.action){
     case "list"->{}
-    case "save"->store.save(GSON.fromJson(request.json,DialogueRoute.class),request.revision);
+    case "create","save"->{
+     var route=GSON.fromJson(request.json,DialogueRoute.class);
+     if(route!=null&&request.action.equals("create")&&store.find(route.id())!=null)throw new IllegalArgumentException("duplicate");
+     store.save(route,request.revision);
+    }
     case "delete"->{if(!request.json.matches("[a-z0-9_-]{1,64}"))throw new IllegalArgumentException();store.delete(request.json,request.revision);}
     default->throw new IllegalArgumentException();
    }
-  }catch(Exception ex){error=store.invalid()?"corrupt":request.revision!=store.snapshot().revision()?"conflict":"save_failed";}
+  }catch(Exception ex){error=store.invalid()?"corrupt":request.revision!=store.snapshot().revision()?"conflict":"duplicate".equals(ex.getMessage())?"duplicate":"save_failed";}
   sendEditor(player,new EditorData(store.snapshot(),store.invalid(),error));
  }
  private static void sendEditor(ServerPlayerEntity player,EditorData value){

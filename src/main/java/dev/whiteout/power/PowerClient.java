@@ -54,6 +54,7 @@ public final class PowerClient implements ClientModInitializer {
   EnvironmentClient.initialize();
   PowerDiagnosticsClient.register();
   PassportClient.register();
+  DialogueRouteClient.register();
   GlassFrostOverlay.register();
   WeatherDepth.register();
   GroundSnow.initialize();
