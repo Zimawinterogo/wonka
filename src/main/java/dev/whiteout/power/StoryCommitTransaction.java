@@ -13,6 +13,16 @@ public final class StoryCommitTransaction {
  }
  public static Result apply(Store store,StoryEventCatalog.Event event)throws Exception {
   if(store.error!=null)throw new IllegalStateException("story store is read-only");
+  if(!event.objectives().isEmpty()){
+   event.validate();var original=StoryObjectiveActions.State.capture(store.data);
+   if(event.once()&&original.completed.contains(event.key()))return Result.ALREADY_COMPLETED;
+   if(!StoryRules.matches(original.variables,event.conditions()))return Result.CONDITIONS_FALSE;
+   var next=original.copy();next.variables=StoryRules.apply(next.variables,event.actions());
+   next.apply(event.objectives());if(event.once())next.completed.add(event.key());
+   next.publish(store.data);
+   try{store.save();}catch(Exception failure){original.publish(store.data);throw failure;}
+   return Result.COMMITTED;
+  }
   return apply(store.data.storyVariables,store.data.completedEvents,event,(variables,completed)->{
    var oldVariables=store.data.storyVariables;var oldCompleted=store.data.completedEvents;
    store.data.storyVariables=variables;store.data.completedEvents=completed;
@@ -23,6 +33,7 @@ public final class StoryCommitTransaction {
  public static Result apply(Map<String,StoryRules.Value> variables,Set<String> completed,
                             StoryEventCatalog.Event event,Writer writer)throws Exception {
   event.validate();Objects.requireNonNull(writer);
+  if(!event.objectives().isEmpty())throw new IllegalArgumentException("objective transaction requires Store");
   if(event.once()&&completed.contains(event.key()))return Result.ALREADY_COMPLETED;
   if(!StoryRules.matches(variables,event.conditions()))return Result.CONDITIONS_FALSE;
   // Permission for a repeatable visual-only event does not rewrite the world save.
