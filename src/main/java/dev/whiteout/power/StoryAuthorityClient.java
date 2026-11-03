@@ -50,7 +50,7 @@ public final class StoryAuthorityClient {
  }
  public static boolean fire(String key,BooleanSupplier action,Consumer<Boolean> callback){
   var mc=MinecraftClient.getInstance();
-  if(mc==null||mc.currentScreen!=null)return false;
+  if(mc==null||mc.currentScreen!=null||DirectorPlayer.playing())return false;
   return request(key,()->true,()->mc.currentScreen==null&&!DirectorPlayer.playing(),action,callback);
  }
 }
