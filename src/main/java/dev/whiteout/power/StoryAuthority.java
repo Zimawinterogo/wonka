@@ -73,6 +73,7 @@ public final class StoryAuthority {
    if(event==null)throw new IllegalArgumentException("unregistered story key");
    if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
+   if(StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,store.data))!=WinterCrisisConditions.Truth.TRUE)return StoryReceipts.Outcome.CONDITIONS_FALSE;
    var result=StoryCommitTransaction.apply(store,event);
    // A delivery error does not turn a committed transaction into a rejected one.
    try{if(result==StoryCommitTransaction.Result.COMMITTED)WhiteoutNetwork.syncAll(player.getServer());else WhiteoutNetwork.sync(player);}

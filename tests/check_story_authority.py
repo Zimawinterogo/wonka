@@ -6,7 +6,7 @@ import json
 root = Path(__file__).resolve().parents[1]
 version = json.loads((root / 'src/main/resources/fabric.mod.json').read_text(encoding='utf-8'))['version']
 with ZipFile(root / f'build/release/Whiteout-{version}-1.21.1.jar') as jar:
-    for name in ('StoryAuthority', 'StoryEventCatalog', 'StoryRequestPolicy', 'StoryCommitTransaction', 'StoryReceipts', 'StoryAuthorityNetwork'):
+    for name in ('StoryAuthority', 'StoryEventCatalog', 'StoryRequestPolicy', 'StoryCommitTransaction', 'StoryReceipts', 'StoryAuthorityNetwork', 'StoryObjectiveActions', 'StoryWorldConditions', 'StoryWorldSource'):
         data = jar.read(f'dev/whiteout/power/{name}.class')
         assert int.from_bytes(data[6:8], 'big') == 65
         assert b'net/minecraft/client/' not in data and b'dev/whiteout/client/' not in data

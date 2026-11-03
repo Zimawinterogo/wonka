@@ -561,7 +561,7 @@ tasks.named('compileJava') { dependsOn 'verifySharpScreens' }
 tasks.named('build') { dependsOn 'assembleWhiteout' }
 
 // All executable regressions use the actual compiled production classes.
-def regressions = ['StoryObjectiveTransactionTest','StoryReceiptsTest','StoryAuthorityTest','StoryAuthorityStoreTest','DialogueRouteTest','PassportRulesTest','LakeStoryPolicyTest','LakeDialogueLinesTest','LakePersistenceTest','WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewFeaturesTest',
+def regressions = ['StoryWorldConditionsTest','StoryObjectiveTransactionTest','StoryReceiptsTest','StoryAuthorityTest','StoryAuthorityStoreTest','DialogueRouteTest','PassportRulesTest','LakeStoryPolicyTest','LakeDialogueLinesTest','LakePersistenceTest','WindowFrostTest','CircuitRulesTest','StarterLogicTest','NewFeaturesTest',
  'GridStatePolicyTest','ForestCandidatePolicyTest','AuditRegressionTest','BuildingAtmosphereTest',
  'BackupLampPolicyTest','MultiNetworkRulesTest','SnapshotChunksTest','ZoneFolderOrderTest',
  'ZoneIdBatcherTest','ZoneMusicContinuityTest','GeneratorLifecycleTest','DiagnosticDataTest','LegacyPersistenceTest','GeneratorMeshTest','AuditHardeningTest','StoreSafetyTest','BackpackPolicyTest','BackpackSyncTest','BackpackModelTest','WeatherDepthTimingTest']
