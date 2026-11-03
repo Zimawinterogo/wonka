@@ -1,9 +1,7 @@
 package dev.whiteout.power;
 
-import com.google.gson.*;
 import dev.whiteout.Store;
 import dev.whiteout.net.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -59,14 +57,8 @@ public final class StoryAuthority {
   long tick=Integer.toUnsignedLong(player.getServer().getTicks());
   if(!BUDGETS.computeIfAbsent(player,p->new StoryRequestPolicy.Budget()).take(tick))return false;
   try{
-   if(!player.isAlive()||player.isSpectator()||packet.data()==null||packet.data().length>8192)throw new IllegalArgumentException("request");
-   JsonObject request=JsonParser.parseString(new String(packet.data(),StandardCharsets.UTF_8)).getAsJsonObject();
-   JsonElement key=request.get("key");
-   if(key==null||!key.isJsonPrimitive()||!key.getAsJsonPrimitive().isString()||key.getAsString().length()>128)throw new IllegalArgumentException("key");
-   StoryEventCatalog definitions=catalog(player.getServer());
-   if(definitions.invalid())throw new IllegalArgumentException("invalid server catalog: "+definitions.error());
-   StoryEventCatalog.Event event=definitions.find(key.getAsString());
-   if(event==null)throw new IllegalArgumentException("unregistered story key");
+   if(!player.isAlive()||player.isSpectator())throw new IllegalArgumentException("player state");
+   StoryEventCatalog.Event event=catalog(player.getServer()).resolve(packet.data());
    if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
    var result=StoryCommitTransaction.apply(store,event);

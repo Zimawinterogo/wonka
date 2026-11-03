@@ -1,14 +1,15 @@
 package dev.whiteout.power;
 
-import com.google.gson.Gson;
+import com.google.gson.*;
 import dev.whiteout.StoryRules;
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /** Server-authored permissions, not another progress store. Never writes a world file. */
 public final class StoryEventCatalog {
- public static final int MAX_BYTES=262144,MAX_EVENTS=128;
+ public static final int MAX_BYTES=262144,MAX_EVENTS=128,MAX_REQUEST_BYTES=8192;
  private static final Gson JSON=new Gson();
  public record Area(String dimension,double x,double y,double z,double radius){
   public void validate(){
@@ -45,6 +46,17 @@ public final class StoryEventCatalog {
  public boolean invalid(){return !error.isEmpty();}
  public String error(){return error;}
  public int size(){return events.size();}
+ /** Legacy packets may contain actions/conditions/once; only the key has authority as a request. */
+ public Event resolve(byte[] payload){
+  if(invalid())throw new IllegalArgumentException("invalid server catalog: "+error);
+  if(payload==null||payload.length>MAX_REQUEST_BYTES)throw new IllegalArgumentException("request size");
+  JsonObject request=JsonParser.parseString(new String(payload,StandardCharsets.UTF_8)).getAsJsonObject();
+  JsonElement key=request.get("key");
+  if(key==null||!key.isJsonPrimitive()||!key.getAsJsonPrimitive().isString()||key.getAsString().length()>128)throw new IllegalArgumentException("key");
+  Event event=find(key.getAsString());
+  if(event==null)throw new IllegalArgumentException("unregistered story key");
+  return event;
+ }
  /** Defensive copy: StoryRules DTOs are mutable in the existing base. */
  public Event find(String key){String json=events.get(key);return json==null?null:JSON.fromJson(json,Event.class);}
 }

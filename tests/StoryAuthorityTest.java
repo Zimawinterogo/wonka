@@ -40,6 +40,13 @@ public final class StoryAuthorityTest {
    String json=JSON.toJson(new StoryEventCatalog.Data(1,List.of(event)));Files.writeString(path,json);
    StoryEventCatalog catalog=new StoryEventCatalog(path);check(!catalog.invalid()&&catalog.size()==1,"catalog loaded");
    check(catalog.find("unknown")==null,"unregistered key");
+   byte[] forged="{\"key\":\"test:bridge\",\"once\":false,\"conditions\":[],\"actions\":[{\"variable\":\"hacked\"}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+   var canonical=catalog.resolve(forged);
+   check(canonical.once()&&canonical.actions().getFirst().variable.equals("chapter"),"client actions and once ignored");
+   for(String payload:List.of("{}","null","[]","{\"key\":123}","{\"key\":\"unknown\"}"," ".repeat(8193))){
+    boolean rejected=false;try{catalog.resolve(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));}catch(RuntimeException expected){rejected=true;}
+    check(rejected,"malformed/unregistered request rejected");
+   }
    catalog.find(event.key()).actions().getFirst().variable="injected";
    check(catalog.find(event.key()).actions().getFirst().variable.equals("chapter"),"defensive DTO copy");
    Map<String,StoryRules.Value> reloadedVariables=JSON.fromJson(JSON.toJson(variables),new com.google.gson.reflect.TypeToken<Map<String,StoryRules.Value>>(){}.getType());
