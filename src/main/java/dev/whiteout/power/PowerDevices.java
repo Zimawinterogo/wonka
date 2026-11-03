@@ -54,6 +54,7 @@ public final class PowerDevices implements ModInitializer {
  static Item item(String name,Item item){return Registry.register(Registries.ITEM,id(name),item);}
  static SoundEvent sound(String name){return Registry.register(Registries.SOUND_EVENT,id(name),SoundEvent.of(id(name)));}
  @Override public void onInitialize(){
+  StoryAuthority.register();
   dev.whiteout.power.backpack.BackpackNetwork.register();
   Registry.register(Registries.ITEM,id("power_switch"),new BlockItem(POWER_SWITCH,new Item.Settings()));
   Registry.register(Registries.ITEM,id("emergency_lamp"),new BlockItem(EMERGENCY_LAMP,new Item.Settings()));

@@ -1,4 +1,5 @@
 {
+  "story.whiteout.request_denied": "Story/editor request denied. The server operator can inspect the Whiteout log and story-authority status.",
   "block.whiteout.generator": "Fuel Generator",
   "block.whiteout.fuse_panel": "Fuse Panel",
   "block.whiteout.storage_shelf": "Storage Shelf",

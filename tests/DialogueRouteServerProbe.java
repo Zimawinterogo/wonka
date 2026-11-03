@@ -7,6 +7,10 @@ public class DialogueRouteServerProbe {
  public static void main(String[] args){
   net.minecraft.SharedConstants.createGameVersion();net.minecraft.Bootstrap.initialize();
   DialogueRouteNetwork.register();
+  StoryAuthority.register();
+  long guards=java.util.Arrays.stream(dev.whiteout.net.WhiteoutNetwork.class.getDeclaredMethods())
+   .filter(m->m.getName().contains("whiteout$before")).count();
+  if(guards!=1)throw new AssertionError("Server story authority Mixin was not applied: "+guards);
   var b=new RegistryByteBuf(Unpooled.buffer(),DynamicRegistryManager.EMPTY);
   try{
    var resolve=new DialogueRouteNetwork.Resolve(42,"lake");DialogueRouteNetwork.Resolve.CODEC.encode(b,resolve);if(!resolve.equals(DialogueRouteNetwork.Resolve.CODEC.decode(b)))throw new AssertionError();

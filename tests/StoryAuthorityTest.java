@@ -1,0 +1,63 @@
+import com.google.gson.Gson;
+import dev.whiteout.StoryRules;
+import dev.whiteout.power.*;
+import java.nio.file.*;
+import java.util.*;
+
+/** Real base StoryRules and production transaction/catalog; no Minecraft world. */
+public final class StoryAuthorityTest {
+ static int checks;
+ static void check(boolean value,String reason){checks++;if(!value)throw new AssertionError(reason);}
+ static final Gson JSON=new Gson();
+ static StoryEventCatalog.Event event(){
+  return JSON.fromJson("""
+   {"key":"test:bridge","once":true,
+    "area":{"dimension":"minecraft:overworld","x":1,"y":72,"z":3,"radius":3},
+    "conditions":[],"actions":[{"variable":"chapter","operation":"SET","value":{"type":"INT","integer":2}}]}
+   """,StoryEventCatalog.Event.class);
+ }
+ public static void main(String[] args)throws Exception{
+  var event=event();event.validate();
+  check(event.area().contains("minecraft:overworld",4,72,3),"boundary permitted");
+  check(!event.area().contains("minecraft:overworld",4.01,72,3),"distance denied");
+  check(!event.area().contains("minecraft:the_nether",1,72,3),"dimension denied");
+  check(!event.area().contains("minecraft:overworld",Double.NaN,72,3),"NaN denied");
+  Map<String,StoryRules.Value> variables=new HashMap<>();variables.put("chapter",StoryRules.Value.of(1));variables.put("unrelated",StoryRules.Value.of(true));
+  Set<String> completed=new HashSet<>(Set.of("other:scene"));int[] saves={0};
+  StoryCommitTransaction.Writer write=(v,c)->{saves[0]++;check(v.get("chapter").integer==2,"canonical action");check(v.get("unrelated").bool,"unrelated variable retained");check(c.containsAll(Set.of("other:scene","test:bridge")),"once and unrelated keys retained");};
+  check(StoryCommitTransaction.apply(variables,completed,event,write)==StoryCommitTransaction.Result.COMMITTED,"commit");
+  check(variables.get("chapter").integer==1&&!completed.contains(event.key()),"input unchanged until publication");
+  try{StoryCommitTransaction.apply(variables,completed,event,(v,c)->{throw new java.io.IOException("disk");});throw new AssertionError("write failure swallowed");}catch(java.io.IOException expected){}
+  check(variables.get("chapter").integer==1&&!completed.contains(event.key()),"failed write does not publish or consume once");
+  StoryCommitTransaction.apply(variables,completed,event,(v,c)->{variables.clear();variables.putAll(v);completed.clear();completed.addAll(c);});
+  check(StoryCommitTransaction.apply(variables,completed,event,write)==StoryCommitTransaction.Result.ALREADY_COMPLETED&&saves[0]==1,"second player cannot repeat once");
+  StoryRules.Condition condition=new StoryRules.Condition();condition.variable="chapter";condition.operator=StoryRules.Operator.EQ;condition.value=StoryRules.Value.of(99);
+  var conditional=new StoryEventCatalog.Event("test:condition",true,event.area(),List.of(condition),event.actions());
+  check(StoryCommitTransaction.apply(variables,completed,conditional,write)==StoryCommitTransaction.Result.CONDITIONS_FALSE&&saves[0]==1,"server precondition");
+  Path dir=Files.createTempDirectory("whiteout-authority-");Path path=dir.resolve("events.json");
+  try{
+   check(new StoryEventCatalog(path).size()==0,"missing catalog denies all story keys");
+   String json=JSON.toJson(new StoryEventCatalog.Data(1,List.of(event)));Files.writeString(path,json);
+   StoryEventCatalog catalog=new StoryEventCatalog(path);check(!catalog.invalid()&&catalog.size()==1,"catalog loaded");
+   check(catalog.find("unknown")==null,"unregistered key");
+   catalog.find(event.key()).actions().getFirst().variable="injected";
+   check(catalog.find(event.key()).actions().getFirst().variable.equals("chapter"),"defensive DTO copy");
+   Map<String,StoryRules.Value> reloadedVariables=JSON.fromJson(JSON.toJson(variables),new com.google.gson.reflect.TypeToken<Map<String,StoryRules.Value>>(){}.getType());
+   Set<String> reloadedCompleted=new HashSet<>(Arrays.asList(JSON.fromJson(JSON.toJson(completed),String[].class)));
+   check(StoryCommitTransaction.apply(reloadedVariables,reloadedCompleted,new StoryEventCatalog(path).find(event.key()),write)==StoryCommitTransaction.Result.ALREADY_COMPLETED,"restart keeps existing once keys");
+   for(String invalid:List.of("{broken","null","{\"schema\":2,\"events\":[]}",JSON.toJson(new StoryEventCatalog.Data(1,List.of(event,event))),json.replace("\"radius\":3.0","\"radius\":-1")," ".repeat(StoryEventCatalog.MAX_BYTES+1))){
+    Files.writeString(path,invalid);var corrupt=new StoryEventCatalog(path);check(corrupt.invalid()&&corrupt.size()==0,"invalid catalog fails closed");check(Files.readString(path).equals(invalid),"invalid file preserved");
+   }
+  }finally{Files.deleteIfExists(path);Files.deleteIfExists(dir);}
+  for(String action:List.of("STORY_OBJECTIVE_EVENT","EVENT_DONE","REMOVE_COMPLETED_EVENT","ACTOR_BEGIN","ACTOR_COMMAND","ACTOR_STOP","EASY_NPC","SAVE_ZONE","CHECKPOINT_LOAD")){
+   check(!StoryRequestPolicy.legacyAllowed(action,false),"unprivileged denied: "+action);check(StoryRequestPolicy.legacyAllowed(action,true),"operator editor: "+action);
+  }
+  for(boolean op:List.of(false,true)){
+   check(!StoryRequestPolicy.legacyAllowed("STORY_COMMIT",op),"raw commit never delegated");check(!StoryRequestPolicy.legacyAllowed("NEW_UNAUDITED_ACTION",op),"unknown fails closed");check(!StoryRequestPolicy.legacyAllowed(null,op),"null fails closed");
+   for(String action:List.of("REQUEST","EQUIP","GOGGLES","REPLACE_BATTERY"))check(StoryRequestPolicy.legacyAllowed(action,op),"ordinary gameplay retained");
+  }
+  var budget=new StoryRequestPolicy.Budget();for(int i=0;i<16;i++)check(budget.take(100),"within budget");
+  check(!budget.take(100)&&!budget.take(119),"flood bounded");check(budget.take(120),"new window");check(budget.take(0),"clock reset");
+  System.out.println("PASS StoryAuthorityTest: "+checks+" checks; real StoryRules, persistence callback, no Minecraft world");
+ }
+}

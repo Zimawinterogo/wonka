@@ -1,4 +1,5 @@
 {
+  "story.whiteout.request_denied": "Сюжетный запрос или действие редактора отклонены. Оператор может проверить журнал Whiteout и story-authority status.",
   "block.whiteout.generator": "Бензиновый генератор",
   "block.whiteout.fuse_panel": "Электрощиток",
   "block.whiteout.storage_shelf": "Стеллаж",

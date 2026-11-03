@@ -27,7 +27,7 @@ public final class EditorHistory {
   if(s==null||!s.dimension.equals(d)){s=new Session(d);sessions.put(p,s);}
   return s;
  }
- public static boolean allowed(ServerPlayerEntity p){return p.isCreative()&&(p.getMainHandStack().isOf(Whiteout.CONTROLLER)||p.getOffHandStack().isOf(Whiteout.CONTROLLER));}
+ public static boolean allowed(ServerPlayerEntity p){return p.hasPermissionLevel(2)&&p.isCreative()&&(p.getMainHandStack().isOf(Whiteout.CONTROLLER)||p.getOffHandStack().isOf(Whiteout.CONTROLLER));}
  public static Zone find(ServerPlayerEntity p,String id){for(Zone z:Store.get(p.getServer()).data.zones)if(z!=null&&id.equals(z.id))return z;return null;}
  public static JsonObject capture(ServerPlayerEntity p,String id){
   JsonObject o=new JsonObject();
