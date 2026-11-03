@@ -78,4 +78,12 @@ public final class StoryEventCatalog {
  }
  /** Defensive copy: StoryRules DTOs are mutable in the existing base. */
  public Event find(String key){String json=events.get(key);return json==null?null:JSON.fromJson(json,Event.class);}
+ public Set<String> dedicatedSceneStartKeys(String scene){
+  Set<String> keys=new HashSet<>();
+  for(String json:events.values()){
+   Event event=JSON.fromJson(json,Event.class);
+   if(event.scenes().size()==1&&event.scenes().getFirst().id().equals(scene)&&event.scenes().getFirst().operation()==StorySceneActions.Operation.START)keys.add(event.key());
+  }
+  return Set.copyOf(keys);
+ }
 }

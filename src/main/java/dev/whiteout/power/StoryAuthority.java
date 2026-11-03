@@ -45,6 +45,10 @@ public final class StoryAuthority {
   var definitions=catalog(server);if(definitions.invalid())throw new IllegalStateException("invalid story catalog");
   var event=definitions.find(key);if(event==null)throw new IllegalArgumentException("unregistered story key: "+key);return event;
  }
+ public static Set<String> sceneStartKeys(MinecraftServer server,String id){
+  var definitions=catalog(server);if(definitions.invalid())throw new IllegalStateException("invalid story catalog");
+  return definitions.dedicatedSceneStartKeys(id);
+ }
  private static void denied(ServerPlayerEntity player,String reason){
   long now=Integer.toUnsignedLong(player.getServer().getTicks());Long previous=WARNINGS.get(player);
   if(previous!=null&&now>=previous&&now-previous<200)return;

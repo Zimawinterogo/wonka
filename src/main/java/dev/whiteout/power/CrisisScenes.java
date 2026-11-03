@@ -15,7 +15,8 @@ import static dev.whiteout.power.WinterCrisisConditions.*;
 public final class CrisisScenes {
  public enum Phase { PREPARATION, ONSET, ESCALATION, CRITICAL, RESOLUTION, AFTERMATH }
  public record Stage(Phase phase,String event,long ticks){}
- public record Scene(String id,String dimension,int priority,long armTimeout,List<Stage> phases){
+ public record Scene(String id,String dimension,int priority,long armTimeout,List<Stage> phases,String resetEvent){
+  public Scene(String id,String dimension,int priority,long armTimeout,List<Stage> phases){this(id,dimension,priority,armTimeout,phases,null);}
   public void validate(){
    if(id==null||!id.matches("[a-z0-9_]{1,24}")||dimension==null||!dimension.matches("[a-z0-9_.-]+:[a-z0-9/._-]+")||dimension.length()>128||priority<0||priority>100||armTimeout<40||armTimeout>72000||phases==null||phases.size()!=6)throw new IllegalArgumentException("scene metadata");
    Set<String> keys=new HashSet<>();long total=0;
@@ -25,6 +26,7 @@ public final class CrisisScenes {
     total+=s.ticks();
    }
    if(total>72000)throw new IllegalArgumentException("scene exceeds 72000 ticks");
+   if(resetEvent!=null&&(!resetEvent.matches("[a-zA-Z0-9_.:/-]{1,128}")||keys.contains(resetEvent)))throw new IllegalArgumentException("reset event");
   }
   public String runtimeId(){return "scene:"+id;}
   public String key(String suffix){return "crisis."+id+"."+suffix;}
@@ -49,6 +51,10 @@ public final class CrisisScenes {
      var event=StoryAuthority.definition(server,phase.event());
      if(!event.once()||!event.serverOnly()||!event.area().dimension().equals(scene.dimension()))throw new IllegalArgumentException("phase needs server-only Once event in scene dimension");
      if(!event.scenes().isEmpty())throw new IllegalArgumentException("nested scene requests in phases are not supported");
+    }
+    if(scene.resetEvent()!=null){
+     var reset=StoryAuthority.definition(server,scene.resetEvent());
+     if(!reset.serverOnly()||reset.once()||!reset.scenes().isEmpty())throw new IllegalArgumentException("reset needs repeatable server-only event without scene requests");
     }
    }
   }catch(Exception failure){scenes.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
@@ -106,9 +112,29 @@ public final class CrisisScenes {
   for(Scene scene:scenes.values())try{
    var view=director.status(scene.runtimeId());boolean queued=flag(store().data,scene,"queued"),active=flag(store().data,scene,"active");
    if(view.isPresent()&&(view.get().state()==State.ACTIVE||view.get().state()==State.ARMED)){
-    if(!queued&&!active)director.cancel(scene.runtimeId(),tick,"durable story cancellation");
+    if(view.get().state()==State.ACTIVE&&!consistent(store().data,scene,view.get().phase()))director.cancel(scene.runtimeId(),tick,"saved phase was reset or is inconsistent");
+    else if(!queued&&!active)director.cancel(scene.runtimeId(),tick,"durable story cancellation");
    }else if(queued||active)start(scene.id(),director,tick);
   }catch(Exception failure){reasons.put(scene.runtimeId(),"request blocked: "+failure.getMessage());}
+ }
+ public static boolean consistent(Store.Data data,Scene scene,int phase){
+  if(phase(data,scene)!=phase)return false;
+  for(int n=0;n<=phase;n++)if(!data.completedEvents.contains(scene.phases().get(n).event()))return false;
+  return true;
+ }
+ public String reset(String id,WinterCrisisDirector director,long tick)throws Exception{
+  Scene scene=scenes.get("scene:"+id);if(scene==null||scene.resetEvent()==null)throw new IllegalArgumentException("scene requires an authored reset event");
+  var reset=StoryAuthority.definition(server,scene.resetEvent());
+  var launchKeys=StoryAuthority.sceneStartKeys(server,id);
+  if(!reset.serverOnly()||reset.once()||!reset.scenes().isEmpty()||reset.world()!=null)throw new IllegalArgumentException("invalid reset event; use story-variable preconditions only");
+  var result=StoryCommitTransaction.apply(store(),reset,s->{
+   for(Stage stage:scene.phases())s.completed.remove(stage.event());
+   s.completed.removeAll(launchKeys);
+   for(String name:List.of("phase","active","queued","done"))s.variables.remove(scene.key(name));
+  });
+  if(result!=StoryCommitTransaction.Result.COMMITTED)throw new IllegalStateException("reset precondition failed");
+  director.cancel(scene.runtimeId(),tick,"authored scene reset");director.forget(scene.runtimeId());reasons.remove(scene.runtimeId());sync();
+  return "Scene reset with authored actions: "+id;
  }
  public boolean ready(String id,int phase){
   Scene scene=scenes.get(id);if(scene==null)return false;
@@ -116,6 +142,7 @@ public final class CrisisScenes {
    var event=StoryAuthority.definition(server,scene.phases().get(phase).event());
    if(!event.once()||!event.serverOnly()||!event.scenes().isEmpty()||!event.area().dimension().equals(scene.dimension()))throw new IllegalStateException("phase definition changed");
    Store store=store();if(store.error!=null)throw new IllegalStateException("Store read-only");
+   if(phase>0&&!consistent(store.data,scene,phase-1)||phase==0&&phase(store.data,scene)!=-1){reasons.put(id,"phase cursor/Once mismatch");return false;}
    if(store.data.completedEvents.contains(event.key())){reasons.put(id,"phase already committed without matching cursor");return false;}
    if(!StoryRules.matches(store.data.storyVariables,event.conditions())){reasons.put(id,"story conditions false");return false;}
    int inspected=0;

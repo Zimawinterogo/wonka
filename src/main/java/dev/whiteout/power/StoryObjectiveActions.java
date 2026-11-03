@@ -10,9 +10,11 @@ import java.util.*;
 public final class StoryObjectiveActions {
  private static final Gson JSON=new Gson();
  private StoryObjectiveActions(){}
- public record Change(String id,ObjectiveRules.Event event,String text,ObjectiveRules.Objective definition){
+ public record Change(String id,ObjectiveRules.Event event,String text,ObjectiveRules.Objective definition,boolean reset){
+  public Change(String id,ObjectiveRules.Event event,String text,ObjectiveRules.Objective definition){this(id,event,text,definition,false);}
   public void validate(){
-   StoryRules.name(id);Objects.requireNonNull(event);
+   StoryRules.name(id);if(!reset)Objects.requireNonNull(event);
+   if(reset&&(event!=null||definition==null))throw new IllegalArgumentException("reset needs only an inactive definition");
    if(text!=null&&text.length()>1024)throw new IllegalArgumentException("objective text");
    if(definition!=null){
     definition.validate();
@@ -48,6 +50,11 @@ public final class StoryObjectiveActions {
   public void apply(List<Change> changes){
    validate(changes);ObjectiveRules.validate(objectives,active);
    for(Change change:changes){
+    if(change.reset()){
+     var replacement=JSON.fromJson(JSON.toJson(change.definition()),ObjectiveRules.Objective.class);
+     objectives.put(change.id(),replacement);if(active.equals(change.id()))active="";
+     ObjectiveRules.initializeVars(variables,replacement);continue;
+    }
     if(!objectives.containsKey(change.id())){
      if(change.definition()==null)throw new IllegalArgumentException("undefined objective: "+change.id());
      var definition=JSON.fromJson(JSON.toJson(change.definition()),ObjectiveRules.Objective.class);

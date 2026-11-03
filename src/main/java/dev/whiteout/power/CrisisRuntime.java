@@ -66,6 +66,7 @@ public final class CrisisRuntime {
    .then(literal("crisis").requires(source->source.hasPermissionLevel(2))
     .then(literal("status").executes(c->status(c.getSource())))
     .then(literal("scene").then(argument("id",StringArgumentType.word()).executes(c->scene(c.getSource(),StringArgumentType.getString(c,"id")))))
+    .then(literal("scene-reset").then(argument("id",StringArgumentType.word()).executes(c->sceneReset(c.getSource(),StringArgumentType.getString(c,"id")))))
     .then(literal("enable").executes(c->enable(c.getSource(),true)))
     .then(literal("disable").executes(c->enable(c.getSource(),false)))
     .then(literal("test").executes(c->test(c.getSource(),null))
@@ -110,6 +111,11 @@ public final class CrisisRuntime {
   Slot s=slot(source);if(s==null)return 0;
   try{return reply(source,s.scenes.start(id,s.director,s.tick));}
   catch(Exception failure){source.sendError(Text.literal("Scene refused: "+failure.getMessage()));return 0;}
+ }
+ private static int sceneReset(ServerCommandSource source,String id){
+  Slot s=slot(source);if(s==null)return 0;
+  try{return reply(source,s.scenes.reset(id,s.director,s.tick));}
+  catch(Exception failure){source.sendError(Text.literal("Scene reset refused: "+failure.getMessage()));return 0;}
  }
  /** Known weather and shelter are deliberately non-destructive availability probes:
   * X OR NOT X is TRUE for a known observation, UNKNOWN for missing/unloaded data. */
