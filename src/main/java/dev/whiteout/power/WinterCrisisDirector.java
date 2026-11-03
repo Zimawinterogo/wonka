@@ -7,7 +7,7 @@ import static dev.whiteout.power.WinterCrisisConditions.*;
 public final class WinterCrisisDirector implements AutoCloseable {
  public enum State { IDLE, ARMED, ACTIVE, COOLDOWN, COMPLETED, CANCELLED }
  public enum Scope { PLAYER, GROUP, WORLD }
- public enum CancelPolicy { REQUIRE_TRUE_WHILE_ACTIVE }
+ public enum CancelPolicy { REQUIRE_TRUE_WHILE_ACTIVE, CHECK_AT_START }
  public enum CompletionPolicy { AFTER_DURATION }
  public record Target(Scope scope,String dimension,Set<UUID> players){
   public Target {
@@ -18,24 +18,32 @@ public final class WinterCrisisDirector implements AutoCloseable {
  }
  public record Spec(String id,Target target,Condition precondition,Condition trigger,int priority,
                     int maxRuns,long holdTicks,long armTimeout,long activeTicks,long cooldownTicks,
-                    CancelPolicy cancellation,CompletionPolicy completion){
+                    CancelPolicy cancellation,CompletionPolicy completion,List<Long> phases){
+  public Spec(String id,Target target,Condition precondition,Condition trigger,int priority,int maxRuns,long holdTicks,long armTimeout,long activeTicks,long cooldownTicks,CancelPolicy cancellation,CompletionPolicy completion){
+   this(id,target,precondition,trigger,priority,maxRuns,holdTicks,armTimeout,activeTicks,cooldownTicks,cancellation,completion,List.of(activeTicks));
+  }
   public Spec {
    if(id==null||!id.matches("[a-z0-9_.:-]{1,64}"))throw new IllegalArgumentException("Invalid scenario ID");
    Objects.requireNonNull(target);Objects.requireNonNull(precondition);Objects.requireNonNull(trigger);
    Objects.requireNonNull(cancellation);Objects.requireNonNull(completion);
+   phases=List.copyOf(phases);
+   if(phases.isEmpty()||phases.size()>6||phases.stream().anyMatch(v->v==null||v<1||v>72000)||phases.stream().mapToLong(Long::longValue).sum()!=activeTicks)throw new IllegalArgumentException("Invalid phases");
    if(priority<0||priority>100||maxRuns<1||maxRuns>100||holdTicks<0||holdTicks>12000||armTimeout<holdTicks+40
     ||armTimeout>72000||activeTicks<1||activeTicks>72000||cooldownTicks<0||cooldownTicks>72000)throw new IllegalArgumentException("Invalid timing/repeats");
   }
  }
- public record View(String id,Target target,State state,int runs,long changed,String reason){}
+ public record View(String id,Target target,State state,int runs,long changed,String reason,int phase){}
  public record Event(long tick,String id,State state,String reason){}
  /** Explicit integration boundary. Implement with an existing, server-safe story API only.
   * Never replay actions on restart. Implementations must handle partial failure/cancellation.
   * Current adapter is diagnostic only; no arbitrary commands or client scene calls. */
  public interface Actions {
   void enter(View view) throws Exception;
+  default boolean ready(View nextPhase) throws Exception {return true;}
+  default void phase(View view) throws Exception {}
   default void complete(View view) throws Exception {}
   default void cancel(View view) throws Exception {}
+  default void cancelPending(View view) throws Exception {}
  }
  @FunctionalInterface public interface Presence {boolean valid(Target target) throws Exception;}
  private static final int MAX_INSTANCES=16,MAX_ACTIVE=4,MAX_CHECKS=4;
@@ -45,10 +53,10 @@ public final class WinterCrisisDirector implements AutoCloseable {
  private boolean enabled,closed;
  private long lastTick=Long.MIN_VALUE;
  private static final class Instance {
-  final Spec spec; State state=State.IDLE; int runs; long changed,checked=Long.MIN_VALUE,ended;
+  final Spec spec; State state=State.IDLE; int runs,phase; long changed,checked=Long.MIN_VALUE,ended;
   String reason="registered";Tracker tracker;
   Instance(Spec spec){this.spec=spec;}
-  View view(){return new View(spec.id(),spec.target(),state,runs,changed,reason);}
+  View view(){return new View(spec.id(),spec.target(),state,runs,changed,reason,phase);}
  }
  public WinterCrisisDirector(Actions actions){this.actions=Objects.requireNonNull(actions);}
  public boolean enabled(){return enabled&&!closed;}
@@ -67,6 +75,17 @@ public final class WinterCrisisDirector implements AutoCloseable {
   i.tracker=new Tracker(i.spec.holdTicks(),0,50);transition(i,State.ARMED,tick,"manual request");return true;
  }
  public List<View> status(){return instances.values().stream().map(Instance::view).toList();}
+ /** Restore only a previously committed phase. Caller validates durable author data first.
+  * Time spent offline is paused; the current phase receives its full duration again. */
+ public boolean restoreActive(String id,int phase,long tick){
+  Instance i=instances.get(id);
+  if(!enabled()||i==null||i.state!=State.IDLE||phase<0||phase>=i.spec.phases().size())return false;
+  i.phase=phase;i.runs=1;transition(i,State.ACTIVE,tick,"restored committed phase; timer restarted");return true;
+ }
+ public boolean forget(String id){
+  Instance i=instances.get(id);if(i==null||i.state==State.ACTIVE||i.state==State.ARMED)return false;
+  instances.remove(id);return true;
+ }
  public List<Event> history(){return List.copyOf(events);}
  public Optional<View> status(String id){return Optional.ofNullable(instances.get(id)).map(Instance::view);}
  private void transition(Instance i,State state,long tick,String reason){
@@ -79,6 +98,7 @@ public final class WinterCrisisDirector implements AutoCloseable {
   boolean active=i.state==State.ACTIVE;i.tracker=null;i.ended=tick;
   transition(i,State.CANCELLED,tick,reason);
   if(active)try{actions.cancel(i.view());}catch(Exception failure){i.reason="cancel action failed: "+failure.getClass().getSimpleName();}
+  else try{actions.cancelPending(i.view());}catch(Exception failure){i.reason="pending cancel failed: "+failure.getClass().getSimpleName();}
   return true;
  }
  public void cancelAll(long tick,String reason){for(String id:List.copyOf(instances.keySet()))cancel(id,tick,reason);}
@@ -105,17 +125,20 @@ public final class WinterCrisisDirector implements AutoCloseable {
     if(i.state==State.COOLDOWN){if(tick-i.ended>=i.spec.cooldownTicks())transition(i,State.IDLE,tick,"ready for manual request");continue;}
     try{
      if(!presence.valid(i.spec.target())){cancel(i.spec.id(),tick,"target absent or dimension changed");continue;}
-     Truth value=cycle.evaluate(new All(List.of(i.spec.precondition(),i.spec.trigger())));
+     Truth value=i.state==State.ACTIVE&&i.spec.cancellation()==CancelPolicy.CHECK_AT_START?Truth.TRUE:cycle.evaluate(new All(List.of(i.spec.precondition(),i.spec.trigger())));
      if(i.state==State.ARMED){
       if(tick-i.changed>=i.spec.armTimeout()){cancel(i.spec.id(),tick,"conditions timed out");continue;}
       Stabilized stable=i.tracker.update(value,tick);
       if(stable.value()==Truth.TRUE&&instances.values().stream().filter(v->v.state==State.ACTIVE).count()<MAX_ACTIVE){
-       i.runs++;i.tracker=null;transition(i,State.ACTIVE,tick,"conditions satisfied");actions.enter(i.view());
+       i.runs++;i.phase=0;i.tracker=null;transition(i,State.ACTIVE,tick,"conditions satisfied");actions.enter(i.view());
       }
      }else if(i.state==State.ACTIVE){
       if(value!=Truth.TRUE){cancel(i.spec.id(),tick,"active condition "+value);continue;}
-      if(tick-i.changed>=i.spec.activeTicks()){
-       actions.complete(i.view());i.ended=tick;transition(i,State.COMPLETED,tick,"duration completed");
+      if(tick-i.changed>=i.spec.phases().get(i.phase)){
+       if(i.phase+1<i.spec.phases().size()){
+        var next=new View(i.spec.id(),i.spec.target(),State.ACTIVE,i.runs,tick,"phase ready",i.phase+1);
+        if(actions.ready(next)){actions.phase(next);i.phase++;transition(i,State.ACTIVE,tick,"phase "+i.phase+" committed");}
+       }else{actions.complete(i.view());i.ended=tick;transition(i,State.COMPLETED,tick,"duration completed");}
       }
      }
     }catch(Exception failure){cancel(i.spec.id(),tick,"scenario failed: "+failure.getClass().getSimpleName());}

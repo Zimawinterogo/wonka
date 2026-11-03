@@ -15,7 +15,7 @@ public final class WinterCrisisConditions {
   public static Truth of(boolean value){return value?TRUE:FALSE;}
  }
  public enum Type { BLIZZARD, OUTSIDE_SHELTER, NETWORK_OUTAGE, GENERATOR_OFF, FUSE_BURNT,
-  LAMP_EMPTY, DOOR_LOCKED, ZONE_ACTIVE, OUTSIDE_REGION }
+  LAMP_EMPTY, DOOR_LOCKED, ZONE_ACTIVE, OUTSIDE_REGION, SCENARIO_READY }
  public record Region(String dimension,double minX,double minY,double minZ,double maxX,double maxY,double maxZ){
   public Region {
    Objects.requireNonNull(dimension);
@@ -32,7 +32,7 @@ public final class WinterCrisisConditions {
    switch(type){
     case BLIZZARD,OUTSIDE_SHELTER,ZONE_ACTIVE,OUTSIDE_REGION->Objects.requireNonNull(player);
     case GENERATOR_OFF,FUSE_BURNT,LAMP_EMPTY,DOOR_LOCKED->Objects.requireNonNull(address);
-    case NETWORK_OUTAGE->Objects.requireNonNull(id);
+    case NETWORK_OUTAGE,SCENARIO_READY->Objects.requireNonNull(id);
    }
    if(type==Type.ZONE_ACTIVE)Objects.requireNonNull(id);
    if(type==Type.OUTSIDE_REGION)Objects.requireNonNull(region);

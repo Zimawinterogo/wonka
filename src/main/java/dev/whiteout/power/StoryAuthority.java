@@ -41,6 +41,10 @@ public final class StoryAuthority {
  private static StoryEventCatalog catalog(MinecraftServer server){
   return CATALOGS.computeIfAbsent(server,s->new StoryEventCatalog(s.getSavePath(WorldSavePath.ROOT).resolve("whiteout-story-events.json")));
  }
+ public static StoryEventCatalog.Event definition(MinecraftServer server,String key){
+  var definitions=catalog(server);if(definitions.invalid())throw new IllegalStateException("invalid story catalog");
+  var event=definitions.find(key);if(event==null)throw new IllegalArgumentException("unregistered story key: "+key);return event;
+ }
  private static void denied(ServerPlayerEntity player,String reason){
   long now=Integer.toUnsignedLong(player.getServer().getTicks());Long previous=WARNINGS.get(player);
   if(previous!=null&&now>=previous&&now-previous<200)return;
@@ -71,6 +75,7 @@ public final class StoryAuthority {
    if(definitions.invalid())throw new IllegalStateException("invalid server catalog");
    StoryEventCatalog.Event event=definitions.find(key);
    if(event==null)throw new IllegalArgumentException("unregistered story key");
+   if(event.serverOnly())throw new IllegalArgumentException("event is server-only");
    if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
    if(StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,store.data))!=WinterCrisisConditions.Truth.TRUE)return StoryReceipts.Outcome.CONDITIONS_FALSE;

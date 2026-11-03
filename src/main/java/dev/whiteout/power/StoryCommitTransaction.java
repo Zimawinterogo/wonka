@@ -30,6 +30,17 @@ public final class StoryCommitTransaction {
    catch(Exception failure){store.data.storyVariables=oldVariables;store.data.completedEvents=oldCompleted;throw failure;}
   });
  }
+ /** Server-only extension point for committing Director markers with the event, in one Store save. */
+ public static Result apply(Store store,StoryEventCatalog.Event event,java.util.function.Consumer<StoryObjectiveActions.State> markers)throws Exception {
+  if(store.error!=null)throw new IllegalStateException("story store is read-only");
+  event.validate();var original=StoryObjectiveActions.State.capture(store.data);
+  if(event.once()&&original.completed.contains(event.key()))return Result.ALREADY_COMPLETED;
+  if(!StoryRules.matches(original.variables,event.conditions()))return Result.CONDITIONS_FALSE;
+  var next=original.copy();next.variables=StoryRules.apply(next.variables,event.actions());next.apply(event.objectives());
+  if(event.once())next.completed.add(event.key());markers.accept(next);StoryRules.validateVariables(next.variables);
+  next.publish(store.data);try{store.save();}catch(Exception failure){original.publish(store.data);throw failure;}
+  return Result.COMMITTED;
+ }
  public static Result apply(Map<String,StoryRules.Value> variables,Set<String> completed,
                             StoryEventCatalog.Event event,Writer writer)throws Exception {
   event.validate();Objects.requireNonNull(writer);
