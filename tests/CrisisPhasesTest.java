@@ -44,6 +44,10 @@ public final class CrisisPhasesTest {
    capacity.register(candidate);check(capacity.restoreActive(candidate.id(),0,0)==(n<4),"restore obeys active capacity");
   }
   capacity.close();
+  int[] resumedPhases={0};var timed=new WinterCrisisDirector(new Actions(){public void enter(View v){throw new AssertionError("restore replay");}public void phase(View v){resumedPhases[0]++;}});
+  timed.enabled(true,0);timed.register(spec());check(!timed.restoreActive("scene:test",1,0,11),"oversized saved timer rejected");
+  check(timed.restoreActive("scene:test",1,0,0),"zero remaining duration restored");timed.tick(0,s->Truth.UNKNOWN,t->true);
+  check(resumedPhases[0]==1&&timed.status("scene:test").orElseThrow().phase()==2,"saved elapsed time advances without replaying current phase");timed.close();
   for(var d:List.of(director,restored,queue,broken))d.close();
   System.out.println("PASS CrisisPhasesTest: "+checks+" phase/wait/restore/cancel/failure checks");
  }

@@ -19,11 +19,14 @@ public final class CrisisProgressStoreTest {
    StoryCommitTransaction.apply(store,event,s->CrisisScenes.markers(s,scene,0,true,false,false));
    store=StoryAuthorityStoreTest.open(path);
    check(CrisisScenes.phase(store.data,scene)==0&&CrisisScenes.flag(store.data,scene,"active"),"phase survives actual Store reopen");
+   check(CrisisScenes.remaining(store.data,scene,0)==10,"legacy phase without timer gets conservative duration");
    check(store.data.storyVariables.get("chapter").integer==2&&store.data.completedEvents.containsAll(Set.of("unrelated",event.key())),"action and phase share one saved state");
    check(StoryCommitTransaction.apply(store,event,s->{throw new AssertionError("committed phase replayed");})==StoryCommitTransaction.Result.ALREADY_COMPLETED,"replay cannot invoke markers");
    var internal=new StoryEventCatalog.Event("finish",false,event.area(),List.of(),List.of());
    StoryCommitTransaction.apply(store,internal,s->CrisisScenes.markers(s,scene,5,false,false,true));
+   StoryCommitTransaction.apply(store,internal,s->s.variables.put(scene.key("remaining"),StoryRules.Value.of(3)));
    var loaded=StoryAuthorityStoreTest.open(path);check(CrisisScenes.flag(loaded.data,scene,"done")&&!CrisisScenes.flag(loaded.data,scene,"active")&&CrisisScenes.phase(loaded.data,scene)==5,"completion survives reopen");
+   check(CrisisScenes.remaining(loaded.data,scene,5)==3,"saved remaining timer survives actual Store reopen");
    var request=new StoryEventCatalog.Event("request_scene",true,event.area(),List.of(),List.of(),List.of(),null,false,List.of(new StorySceneActions.Change("queued_scene",StorySceneActions.Operation.START)));
    StoryCommitTransaction.apply(loaded,request);loaded=StoryAuthorityStoreTest.open(path);
    check(loaded.data.storyVariables.get("crisis.queued_scene.queued").bool&&loaded.data.completedEvents.contains("request_scene"),"scene queue request and triggering Once persist together");

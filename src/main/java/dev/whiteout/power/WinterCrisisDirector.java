@@ -78,9 +78,14 @@ public final class WinterCrisisDirector implements AutoCloseable {
  /** Restore only a previously committed phase. Caller validates durable author data first.
   * Time spent offline is paused; the current phase receives its full duration again. */
  public boolean restoreActive(String id,int phase,long tick){
+  Instance i=instances.get(id);if(i==null||phase<0||phase>=i.spec.phases().size())return false;
+  return restoreActive(id,phase,tick,i.spec.phases().get(phase));
+ }
+ public boolean restoreActive(String id,int phase,long tick,long remaining){
   Instance i=instances.get(id);
   if(!enabled()||i==null||i.state!=State.IDLE||phase<0||phase>=i.spec.phases().size()||instances.values().stream().filter(v->v.state==State.ACTIVE).count()>=MAX_ACTIVE)return false;
-  i.phase=phase;i.runs=1;transition(i,State.ACTIVE,tick,"restored committed phase; timer restarted");return true;
+  if(remaining<0||remaining>i.spec.phases().get(phase))return false;
+  i.phase=phase;i.runs=1;transition(i,State.ACTIVE,tick,"restored committed phase");i.changed=tick-(i.spec.phases().get(phase)-remaining);return true;
  }
  public boolean forget(String id){
   Instance i=instances.get(id);if(i==null||i.state==State.ACTIVE||i.state==State.ARMED)return false;

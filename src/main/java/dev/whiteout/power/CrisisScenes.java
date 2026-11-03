@@ -75,6 +75,11 @@ public final class CrisisScenes {
   var v=data.storyVariables.get(scene.key(name));if(v==null)return false;
   if(v.type!=StoryRules.Type.BOOL)throw new IllegalStateException("invalid crisis flag");return v.bool;
  }
+ public static long remaining(Store.Data data,Scene scene,int phase){
+  var value=data.storyVariables.get(scene.key("remaining"));long duration=scene.phases().get(phase).ticks();
+  if(value==null)return duration;
+  if(value.type!=StoryRules.Type.INT||value.integer<0||value.integer>duration)throw new IllegalStateException("invalid phase timer");return value.integer;
+ }
  public static void markers(StoryObjectiveActions.State state,Scene scene,int phase,boolean active,boolean queued,boolean done){
   if(phase>=0)state.variables.put(scene.key("phase"),StoryRules.Value.of(phase));
   state.variables.put(scene.key("active"),StoryRules.Value.of(active));state.variables.put(scene.key("queued"),StoryRules.Value.of(queued));state.variables.put(scene.key("done"),StoryRules.Value.of(done));
@@ -100,7 +105,8 @@ public final class CrisisScenes {
   if(phase>=0){
    for(int n=0;n<=phase;n++)if(!store().data.completedEvents.contains(scene.phases().get(n).event()))throw new IllegalStateException("phase marker does not match committed events");
    if(director.status().stream().filter(v->v.state()==State.ACTIVE).count()>=4)throw new IllegalStateException("waiting for active scene capacity");
-   flags(scene,true,false,false);if(!director.restoreActive(scene.runtimeId(),phase,tick))throw new IllegalStateException("restore rejected");
+   long remaining=remaining(store().data,scene,phase);
+   flags(scene,true,false,false);if(!director.restoreActive(scene.runtimeId(),phase,tick,remaining))throw new IllegalStateException("restore rejected");
   }else{
    if(store().data.completedEvents.contains(scene.phases().getFirst().event()))throw new IllegalStateException("phase event committed without progress marker");
    flags(scene,false,true,false);if(!director.arm(scene.runtimeId(),tick))throw new IllegalStateException("arm rejected");
@@ -122,6 +128,16 @@ public final class CrisisScenes {
    }else if(queued||active)start(scene.id(),director,tick);
   }catch(Exception failure){reasons.put(scene.runtimeId(),"request blocked: "+failure.getMessage());}
  }
+ /** One write at orderly shutdown, never serialization per tick. Crash recovery is conservative. */
+ public void checkpoint(WinterCrisisDirector director,long tick)throws Exception{
+  var active=director.status().stream().filter(v->v.state()==State.ACTIVE&&owns(v.id())).toList();if(active.isEmpty())return;
+  StoryCommitTransaction.apply(store(),internal(scenes.get(active.getFirst().id())),state->{
+   for(View view:active){
+    Scene scene=scenes.get(view.id());long remaining=Math.max(0,scene.phases().get(view.phase()).ticks()-Math.max(0,tick-view.changed()));
+    state.variables.put(scene.key("remaining"),StoryRules.Value.of((int)remaining));
+   }
+  });
+ }
  public static boolean consistent(Store.Data data,Scene scene,int phase){
   if(phase(data,scene)!=phase)return false;
   for(int n=0;n<=phase;n++)if(!data.completedEvents.contains(scene.phases().get(n).event()))return false;
@@ -135,7 +151,7 @@ public final class CrisisScenes {
   var result=StoryCommitTransaction.apply(store(),reset,s->{
    for(Stage stage:scene.phases())s.completed.remove(stage.event());
    s.completed.removeAll(launchKeys);
-   for(String name:List.of("phase","active","queued","done"))s.variables.remove(scene.key(name));
+   for(String name:List.of("phase","active","queued","done","remaining"))s.variables.remove(scene.key(name));
   });
   if(result!=StoryCommitTransaction.Result.COMMITTED)throw new IllegalStateException("reset precondition failed");
   director.cancel(scene.runtimeId(),tick,"authored scene reset");director.forget(scene.runtimeId());reasons.remove(scene.runtimeId());sync();
@@ -163,7 +179,7 @@ public final class CrisisScenes {
  public void advance(View view)throws Exception{
   Scene scene=scenes.get(view.id());if(!ready(view.id(),view.phase()))throw new IllegalStateException("phase conditions changed");
   var event=StoryAuthority.definition(server,scene.phases().get(view.phase()).event());
-  var result=StoryCommitTransaction.apply(store(),event,s->markers(s,scene,view.phase(),true,false,false));
+  var result=StoryCommitTransaction.apply(store(),event,s->{markers(s,scene,view.phase(),true,false,false);s.variables.put(scene.key("remaining"),StoryRules.Value.of((int)scene.phases().get(view.phase()).ticks()));});
   if(result!=StoryCommitTransaction.Result.COMMITTED)throw new IllegalStateException("phase not committed: "+result);sync();
  }
  public void complete(View view)throws Exception{Scene scene=scenes.get(view.id());flags(scene,false,false,true);reasons.remove(view.id());sync();}

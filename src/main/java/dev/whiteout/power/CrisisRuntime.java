@@ -49,7 +49,10 @@ public final class CrisisRuntime {
    Slot slot=new Slot(server,settings);SERVERS.put(server,slot);slot.scenes.recover(slot.director,slot.tick);
    if(settings.blocked())LOG.error("Winter Crisis disabled: {}. File preserved.",settings.error());
   });
-  ServerLifecycleEvents.SERVER_STOPPING.register(server->{Slot slot=SERVERS.remove(server);if(slot!=null){slot.stopping=true;slot.director.close();}});
+  ServerLifecycleEvents.SERVER_STOPPING.register(server->{Slot slot=SERVERS.remove(server);if(slot!=null){
+   try{slot.scenes.checkpoint(slot.director,slot.tick);}catch(Exception failure){LOG.error("Crisis timers could not be checkpointed; committed phase remains recoverable",failure);}
+   slot.stopping=true;slot.director.close();
+  }});
   ServerPlayConnectionEvents.DISCONNECT.register((handler,server)->{
    Slot s=SERVERS.get(server);if(s==null)return;
    s.director.departed(handler.getPlayer().getUuid(),s.tick);
