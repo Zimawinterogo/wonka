@@ -34,8 +34,9 @@ public final class StoryEventCatalog {
    return this.dimension.equals(dimension)&&Double.isFinite(dx)&&Double.isFinite(dy)&&Double.isFinite(dz)&&dx*dx+dy*dy+dz*dz<=radius*radius;
   }
  }
- public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly){
-  public Event { objectives=objectives==null?List.of():List.copyOf(objectives); }
+ public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes){
+  public Event { objectives=objectives==null?List.of():List.copyOf(objectives);scenes=scenes==null?List.of():List.copyOf(scenes); }
+  public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly){this(key,once,area,conditions,actions,objectives,world,serverOnly,List.of());}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions){this(key,once,area,conditions,actions,List.of(),null,false);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives){this(key,once,area,conditions,actions,objectives,null,false);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world){this(key,once,area,conditions,actions,objectives,world,false);}
@@ -43,6 +44,7 @@ public final class StoryEventCatalog {
    if(key==null||!key.matches("[a-zA-Z0-9_.:/-]{1,128}")||area==null||conditions==null||actions==null)throw new IllegalArgumentException("event");
    area.validate();StoryRules.validate(conditions,actions);StoryObjectiveActions.validate(objectives);
    if(world!=null)world.validate();
+   StorySceneActions.validate(scenes);
   }
  }
  public record Data(int schema,List<Event> events){}

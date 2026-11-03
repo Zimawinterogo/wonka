@@ -44,7 +44,7 @@ public final class CrisisRuntime {
  public static synchronized void register(){
   if(registered)return;registered=true;
   ServerLifecycleEvents.SERVER_STARTED.register(server->{
-   Slot old=SERVERS.remove(server);if(old!=null)old.director.close();
+   Slot old=SERVERS.remove(server);if(old!=null){old.stopping=true;old.director.close();}
    CrisisSettings settings=CrisisSettings.load(server.getSavePath(WorldSavePath.ROOT).resolve("whiteout-winter-crisis.json"));
    Slot slot=new Slot(server,settings);SERVERS.put(server,slot);slot.scenes.recover(slot.director,slot.tick);
    if(settings.blocked())LOG.error("Winter Crisis disabled: {}. File preserved.",settings.error());
@@ -58,6 +58,7 @@ public final class CrisisRuntime {
   ServerTickEvents.END_SERVER_TICK.register(server->{
    Slot s=SERVERS.get(server);if(s==null||server.getCurrentPlayerCount()==0)return;s.tick++;
    if(!s.director.enabled()||s.tick%10!=0)return;
+   s.scenes.reconcile(s.director,s.tick);
    var source=new CrisisWorldSource(server);
    s.director.tick(s.tick,signal->signal.type()==Type.SCENARIO_READY?Truth.of(s.scenes.ready(signal.id(),0)):source.sample(signal),target->present(server,target));
   });
@@ -83,6 +84,9 @@ public final class CrisisRuntime {
   return true;
  }
  private static Slot slot(ServerCommandSource source){return SERVERS.get(source.getServer());}
+ public static boolean requestable(MinecraftServer server,StorySceneActions.Change request){
+  Slot slot=SERVERS.get(server);return slot!=null&&slot.scenes.owns("scene:"+request.id())&&(request.operation()==StorySceneActions.Operation.CANCEL||slot.director.enabled());
+ }
  private static int reply(ServerCommandSource source,String text){source.sendFeedback(()->Text.literal(text),false);return 1;}
  private static int enable(ServerCommandSource source,boolean value){
   Slot s=slot(source);if(s==null)return reply(source,"Crisis runtime not ready");

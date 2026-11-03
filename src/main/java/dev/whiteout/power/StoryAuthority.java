@@ -76,6 +76,7 @@ public final class StoryAuthority {
    StoryEventCatalog.Event event=definitions.find(key);
    if(event==null)throw new IllegalArgumentException("unregistered story key");
    if(event.serverOnly())throw new IllegalArgumentException("event is server-only");
+   for(var scene:event.scenes())if(!CrisisRuntime.requestable(player.getServer(),scene))throw new IllegalArgumentException("scene unavailable: "+scene.id());
    if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
    if(StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,store.data))!=WinterCrisisConditions.Truth.TRUE)return StoryReceipts.Outcome.CONDITIONS_FALSE;

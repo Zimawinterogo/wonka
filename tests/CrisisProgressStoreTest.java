@@ -24,6 +24,12 @@ public final class CrisisProgressStoreTest {
    var internal=new StoryEventCatalog.Event("finish",false,event.area(),List.of(),List.of());
    StoryCommitTransaction.apply(store,internal,s->CrisisScenes.markers(s,scene,5,false,false,true));
    var loaded=StoryAuthorityStoreTest.open(path);check(CrisisScenes.flag(loaded.data,scene,"done")&&!CrisisScenes.flag(loaded.data,scene,"active")&&CrisisScenes.phase(loaded.data,scene)==5,"completion survives reopen");
+   var request=new StoryEventCatalog.Event("request_scene",true,event.area(),List.of(),List.of(),List.of(),null,false,List.of(new StorySceneActions.Change("queued_scene",StorySceneActions.Operation.START)));
+   StoryCommitTransaction.apply(loaded,request);loaded=StoryAuthorityStoreTest.open(path);
+   check(loaded.data.storyVariables.get("crisis.queued_scene.queued").bool&&loaded.data.completedEvents.contains("request_scene"),"scene queue request and triggering Once persist together");
+   var cancel=new StoryEventCatalog.Event("cancel_scene",true,event.area(),List.of(),List.of(),List.of(),null,false,List.of(new StorySceneActions.Change("queued_scene",StorySceneActions.Operation.CANCEL)));
+   StoryCommitTransaction.apply(loaded,cancel);loaded=StoryAuthorityStoreTest.open(path);
+   check(!loaded.data.storyVariables.get("crisis.queued_scene.queued").bool&&!loaded.data.storyVariables.get("crisis.queued_scene.active").bool,"durable cancellation survives restart");
    loaded.data.storyVariables.put(scene.key("phase"),StoryRules.Value.of(99));
    try{CrisisScenes.phase(loaded.data,scene);throw new AssertionError();}catch(IllegalStateException expected){checks++;}
   }finally{Files.deleteIfExists(tmp);Files.deleteIfExists(dir.resolve("zones.json.bak"));Files.deleteIfExists(path);Files.deleteIfExists(dir);}

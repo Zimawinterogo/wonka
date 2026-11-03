@@ -48,6 +48,7 @@ public final class CrisisScenes {
      if(!events.add(phase.event()))throw new IllegalArgumentException("phase event shared by scenes");
      var event=StoryAuthority.definition(server,phase.event());
      if(!event.once()||!event.serverOnly()||!event.area().dimension().equals(scene.dimension()))throw new IllegalArgumentException("phase needs server-only Once event in scene dimension");
+     if(!event.scenes().isEmpty())throw new IllegalArgumentException("nested scene requests in phases are not supported");
     }
    }
   }catch(Exception failure){scenes.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
@@ -87,6 +88,7 @@ public final class CrisisScenes {
   int phase=phase(store().data,scene);
   if(phase>=0){
    for(int n=0;n<=phase;n++)if(!store().data.completedEvents.contains(scene.phases().get(n).event()))throw new IllegalStateException("phase marker does not match committed events");
+   if(director.status().stream().filter(v->v.state()==State.ACTIVE).count()>=4)throw new IllegalStateException("waiting for active scene capacity");
    flags(scene,true,false,false);if(!director.restoreActive(scene.runtimeId(),phase,tick))throw new IllegalStateException("restore rejected");
   }else{
    if(store().data.completedEvents.contains(scene.phases().getFirst().event()))throw new IllegalStateException("phase event committed without progress marker");
@@ -100,11 +102,19 @@ public final class CrisisScenes {
    if(!flag(store().data,scene,"done")&&(flag(store().data,scene,"active")||flag(store().data,scene,"queued")))start(scene.id(),director,tick);
   }catch(Exception failure){reasons.put(scene.runtimeId(),"restore blocked: "+failure.getMessage());}
  }
+ public void reconcile(WinterCrisisDirector director,long tick){
+  for(Scene scene:scenes.values())try{
+   var view=director.status(scene.runtimeId());boolean queued=flag(store().data,scene,"queued"),active=flag(store().data,scene,"active");
+   if(view.isPresent()&&(view.get().state()==State.ACTIVE||view.get().state()==State.ARMED)){
+    if(!queued&&!active)director.cancel(scene.runtimeId(),tick,"durable story cancellation");
+   }else if(queued||active)start(scene.id(),director,tick);
+  }catch(Exception failure){reasons.put(scene.runtimeId(),"request blocked: "+failure.getMessage());}
+ }
  public boolean ready(String id,int phase){
   Scene scene=scenes.get(id);if(scene==null)return false;
   try{
    var event=StoryAuthority.definition(server,scene.phases().get(phase).event());
-   if(!event.once()||!event.serverOnly())throw new IllegalStateException("phase definition changed");
+   if(!event.once()||!event.serverOnly()||!event.scenes().isEmpty()||!event.area().dimension().equals(scene.dimension()))throw new IllegalStateException("phase definition changed");
    Store store=store();if(store.error!=null)throw new IllegalStateException("Store read-only");
    if(store.data.completedEvents.contains(event.key())){reasons.put(id,"phase already committed without matching cursor");return false;}
    if(!StoryRules.matches(store.data.storyVariables,event.conditions())){reasons.put(id,"story conditions false");return false;}
