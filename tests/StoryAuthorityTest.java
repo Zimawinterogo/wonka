@@ -63,6 +63,11 @@ public final class StoryAuthorityTest {
    }
    catalog.find(event.key()).actions().getFirst().variable="injected";
    check(catalog.find(event.key()).actions().getFirst().variable.equals("chapter"),"defensive DTO copy");
+   var start=new StorySceneActions.Change("scene_a",StorySceneActions.Operation.START);
+   var dedicated=new StoryEventCatalog.Event("dedicated",true,event.area(),List.of(),List.of(),List.of(),null,false,List.of(start));
+   var shared=new StoryEventCatalog.Event("shared",true,event.area(),List.of(),List.of(),List.of(),null,false,List.of(start,new StorySceneActions.Change("scene_b",StorySceneActions.Operation.START)));
+   Files.writeString(path,JSON.toJson(new StoryEventCatalog.Data(1,List.of(event,dedicated,shared))));
+   check(new StoryEventCatalog(path).dedicatedSceneStartKeys("scene_a").equals(Set.of("dedicated")),"scene reset excludes unrelated/shared Once keys");
    Map<String,StoryRules.Value> reloadedVariables=JSON.fromJson(JSON.toJson(variables),new com.google.gson.reflect.TypeToken<Map<String,StoryRules.Value>>(){}.getType());
    Set<String> reloadedCompleted=new HashSet<>(Arrays.asList(JSON.fromJson(JSON.toJson(completed),String[].class)));
    check(StoryCommitTransaction.apply(reloadedVariables,reloadedCompleted,new StoryEventCatalog(path).find(event.key()),write)==StoryCommitTransaction.Result.ALREADY_COMPLETED,"restart keeps existing once keys");

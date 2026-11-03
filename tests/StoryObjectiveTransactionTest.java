@@ -53,6 +53,11 @@ public final class StoryObjectiveTransactionTest {
    Store loaded=StoryAuthorityStoreTest.open(path);
    check(loaded.data.activeObjective.equals("hidden")&&loaded.data.completedEvents.containsAll(Set.of("other_scene","advance","hidden")),"restart and other-scene preservation");
    check(loaded.data.storyVariables.get("rewards").integer==3,"hooks execute once across restart");
+   var reset=new StoryObjectiveActions.Change("first",null,null,definition("first"),true);
+   StoryCommitTransaction.apply(loaded,event("reset_first",reset));
+   check(loaded.data.objectives.get("first").status==ObjectiveRules.Status.INACTIVE&&!loaded.data.storyVariables.get("objective.first.completed").bool,"authored reset clears only selected objective state");
+   check(loaded.data.activeObjective.equals("hidden")&&loaded.data.storyVariables.get("rewards").integer==3,"reset preserves other active objective and does not run hooks");
+   Store resetLoaded=StoryAuthorityStoreTest.open(path);check(resetLoaded.data.objectives.get("first").status==ObjectiveRules.Status.INACTIVE,"objective reset survives reopen");
    var bad=definition("active_definition");bad.status=ObjectiveRules.Status.ACTIVE;
    try{event("bad_definition",change(bad.id,ObjectiveRules.Event.START,bad)).validate();throw new AssertionError();}catch(IllegalArgumentException expected){checks++;}
    var decoded=JSON.fromJson(JSON.toJson(start),StoryEventCatalog.Event.class);decoded.validate();check(decoded.objectives().size()==1,"catalog JSON roundtrip");

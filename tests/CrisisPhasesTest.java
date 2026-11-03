@@ -38,6 +38,12 @@ public final class CrisisPhasesTest {
   broken.enabled(true,0);broken.register(spec());broken.arm("scene:test",0);broken.tick(0,s->Truth.TRUE,t->true);broken.tick(10,s->Truth.TRUE,t->true);
   var stopped=broken.status("scene:test").orElseThrow();check(stopped.state()==State.CANCELLED&&stopped.phase()==0,"failed phase does not advance cursor");
   check(!broken.restoreActive("scene:test",6,20),"invalid restore refused");
+  var capacity=new WinterCrisisDirector(actions);capacity.enabled(true,0);var base=spec();
+  for(int n=0;n<5;n++){
+   var candidate=new Spec("restore"+n,base.target(),base.precondition(),base.trigger(),1,1,0,100,60,0,base.cancellation(),base.completion(),base.phases());
+   capacity.register(candidate);check(capacity.restoreActive(candidate.id(),0,0)==(n<4),"restore obeys active capacity");
+  }
+  capacity.close();
   for(var d:List.of(director,restored,queue,broken))d.close();
   System.out.println("PASS CrisisPhasesTest: "+checks+" phase/wait/restore/cancel/failure checks");
  }

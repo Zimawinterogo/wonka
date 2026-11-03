@@ -3,7 +3,7 @@ gradle.projectsEvaluated {
  def p=gradle.rootProject
  p.tasks.register('compileFoundationTests', JavaCompile) {
   dependsOn p.tasks.named('classes')
-  source p.fileTree('tests') { include 'LakeJournalTest.java'; include 'BarricadeCollisionTest.java'; include 'BarricadeSupportTest.java'; include 'WorldState*Test.java'; include 'Crisis*Test.java'; include 'FoundationBootstrap.java' }
+  source p.fileTree('tests') { include 'LakeJournalTest.java'; include 'BarricadeCollisionTest.java'; include 'BarricadeSupportTest.java'; include 'WorldState*Test.java'; include 'Crisis*Test.java'; include 'FoundationBootstrap.java'; exclude 'CrisisProgressStoreTest.java' /* compiled/executed with Store helpers by check */ }
   // Overlay classes must precede the older binary base when compiling tests.
   classpath=p.sourceSets.main.output+p.sourceSets.main.compileClasspath
   destinationDirectory=p.layout.buildDirectory.dir('foundation-tests')
