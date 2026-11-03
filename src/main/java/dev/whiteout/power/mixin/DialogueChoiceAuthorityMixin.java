@@ -17,8 +17,11 @@ public abstract class DialogueChoiceAuthorityMixin {
  @Shadow private void logCurrentLine(){throw new AssertionError();}
  @Shadow private void showPlayerReply(DialogueManager.Line line,String text){throw new AssertionError();}
  @Shadow private void executeReply(String command,String dialogue,int next){throw new AssertionError();}
- @Inject(method="choose",at=@At("HEAD"),remap=false)
- private void whiteout$rememberChoice(int index,CallbackInfo ci){whiteout$choiceIndex=index;}
+ @Inject(method="choose",at=@At("HEAD"),cancellable=true,remap=false)
+ private void whiteout$rememberChoice(int index,CallbackInfo ci){
+  if(StoryAuthorityClient.busy()){ci.cancel();return;}
+  whiteout$choiceIndex=index;
+ }
  @Redirect(method="choose",at=@At(value="INVOKE",target="Ldev/whiteout/client/StoryRuntime;commit(Ljava/lang/String;ZLjava/util/List;Ljava/util/List;)Z"),remap=false)
  private boolean whiteout$awaitChoice(String key,boolean once,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions){
   var line=currentLine();var choice=line.choices().get(whiteout$choiceIndex);var mc=MinecraftClient.getInstance();

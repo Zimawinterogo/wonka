@@ -11,12 +11,11 @@ tool = Path(__file__).resolve().parents[1] / 'tools/migrate_story_triggers.py'
 spec = importlib.util.spec_from_file_location('migrate', tool)
 migrate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(migrate)
-trigger = dict(id='lake_gate', enabled=True, once=True, type='ENTER_BOX', delayTicks=0,
-               dimension='minecraft:overworld', x1=12, x2=10, y1=70, y2=72, z1=-2, z2=2,
-               sceneId='', conditions=[dict(key='chapter', value='lake')],
-               actions=[dict(key='gate_seen', value='yes')], effects=[])
-data = dict(triggers=[trigger])
+fixtures = Path(__file__).resolve().parent / 'fixtures'
+data = migrate.read_json(fixtures / 'story-migration-legacy.json')
+trigger = data['triggers'][0]
 result = migrate.convert(data)
+assert result == migrate.read_json(fixtures / 'story-migration-catalog.json')
 event = result['events'][0]
 assert event['key'] == 'cutscene_trigger:lake_gate' and event['once'] is True
 assert event['conditions'] == trigger['conditions'] and event['actions'] == trigger['actions']

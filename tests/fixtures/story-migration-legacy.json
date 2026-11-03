@@ -1,0 +1,1 @@
+{"triggers":[{"id":"lake_gate","enabled":true,"once":true,"type":"ENTER_BOX","delayTicks":0,"dimension":"minecraft:overworld","x1":12,"x2":10,"y1":70,"y2":72,"z1":-2,"z2":2,"sceneId":"","conditions":[{"variable":"chapter","operator":"EQ","value":{"type":"INT","integer":1}}],"actions":[{"variable":"gate_seen","operation":"SET","value":{"type":"BOOL","bool":true}}],"effects":[]}]}

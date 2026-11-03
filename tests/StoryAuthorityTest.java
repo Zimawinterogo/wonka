@@ -18,6 +18,13 @@ public final class StoryAuthorityTest {
  }
  public static void main(String[] args)throws Exception{
   var event=event();event.validate();
+  // Shared fixture is also checked against the real Python converter in check_story_migration.py.
+  var migrated=new StoryEventCatalog(Path.of("tests/fixtures/story-migration-catalog.json"));
+  check(!migrated.invalid()&&migrated.size()==1,"migration output accepted by production catalog");
+  var imported=migrated.find("cutscene_trigger:lake_gate");
+  check(imported.area().contains("minecraft:overworld",10,70,-2)&&!imported.area().contains("minecraft:overworld",13,70,-2),"migrated box deserialized correctly");
+  check(StoryCommitTransaction.apply(Map.of("chapter",StoryRules.Value.of(1)),Set.of(),imported,
+   (v,c)->check(v.get("gate_seen").bool&&c.contains(imported.key()),"migrated rules execute and retain once"))==StoryCommitTransaction.Result.COMMITTED,"migrated transaction");
   check(event.area().contains("minecraft:overworld",4,72,3),"boundary permitted");
   check(!event.area().contains("minecraft:overworld",4.01,72,3),"distance denied");
   check(!event.area().contains("minecraft:the_nether",1,72,3),"dimension denied");
