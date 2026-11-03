@@ -47,7 +47,7 @@ public final class StoryAuthority {
   if(previous!=null&&now>=previous&&now-previous<200)return;
   WARNINGS.put(player,now);
   player.sendMessage(Text.translatable("story.whiteout.request_denied"),false);
-  LOG.warn("Rejected story/editor request from {}: {}",player.getUuid(),reason);
+  LOG.warn("Rejected story/editor request from {}: {}",player.getUuid(),reason.substring(0,Math.min(160,reason.length())));
  }
  /** true delegates to the original handler; false means denied or handled here. */
  public static boolean accept(ServerPlayerEntity player,WhiteoutActionPayload packet){
@@ -69,13 +69,7 @@ public final class StoryAuthority {
    if(event==null)throw new IllegalArgumentException("unregistered story key");
    if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
-   if(store.error!=null)throw new IllegalStateException("story store is read-only");
-   var result=StoryCommitTransaction.apply(store.data.storyVariables,store.data.completedEvents,event,(variables,completed)->{
-    var oldVariables=store.data.storyVariables;var oldCompleted=store.data.completedEvents;
-    store.data.storyVariables=variables;store.data.completedEvents=completed;
-    try{store.save();}
-    catch(Exception failure){store.data.storyVariables=oldVariables;store.data.completedEvents=oldCompleted;throw failure;}
-   });
+   var result=StoryCommitTransaction.apply(store,event);
    if(result==StoryCommitTransaction.Result.COMMITTED)WhiteoutNetwork.syncAll(player.getServer());
   }catch(Exception failure){denied(player,failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage());}
   return false;
