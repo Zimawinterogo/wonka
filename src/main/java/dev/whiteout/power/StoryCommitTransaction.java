@@ -25,6 +25,8 @@ public final class StoryCommitTransaction {
   event.validate();Objects.requireNonNull(writer);
   if(event.once()&&completed.contains(event.key()))return Result.ALREADY_COMPLETED;
   if(!StoryRules.matches(variables,event.conditions()))return Result.CONDITIONS_FALSE;
+  // Permission for a repeatable visual-only event does not rewrite the world save.
+  if(!event.once()&&event.actions().isEmpty())return Result.COMMITTED;
   Map<String,StoryRules.Value> next=StoryRules.apply(variables,event.actions());
   StoryRules.validateVariables(next);
   Set<String> nextCompleted=new HashSet<>(completed);

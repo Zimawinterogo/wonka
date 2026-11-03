@@ -11,20 +11,32 @@ import java.util.*;
 public final class StoryEventCatalog {
  public static final int MAX_BYTES=262144,MAX_EVENTS=128,MAX_REQUEST_BYTES=8192;
  private static final Gson JSON=new Gson();
- public record Area(String dimension,double x,double y,double z,double radius){
+ /** Half-open exact bounds, matching normalized legacy ENTER_BOX geometry. */
+ public record Box(double x1,double y1,double z1,double x2,double y2,double z2){
   public void validate(){
-   if(dimension==null||!dimension.matches("[a-z0-9_.-]+:[a-z0-9/._-]+")||dimension.length()>128||
+   double[] lo={x1,y1,z1},hi={x2,y2,z2};
+   for(int i=0;i<3;i++)if(!Double.isFinite(lo[i])||!Double.isFinite(hi[i])||lo[i]>=hi[i]||hi[i]-lo[i]>256||Math.abs(lo[i])>(i==1?2048:30000000)||Math.abs(hi[i])>(i==1?2048:30000000))throw new IllegalArgumentException("box");
+  }
+  public boolean contains(double x,double y,double z){return x>=x1&&x<x2&&y>=y1&&y<y2&&z>=z1&&z<z2;}
+ }
+ public record Area(String dimension,double x,double y,double z,double radius,Box box){
+  public Area(String dimension,double x,double y,double z,double radius){this(dimension,x,y,z,radius,null);}
+  public void validate(){
+   if(dimension==null||!dimension.matches("[a-z0-9_.-]+:[a-z0-9/._-]+")||dimension.length()>128)throw new IllegalArgumentException("dimension");
+   if(box!=null){box.validate();if(x!=0||y!=0||z!=0||radius!=0)throw new IllegalArgumentException("ambiguous area");return;}
+   if(
       !Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(z)||Math.abs(x)>30000000||Math.abs(z)>30000000||
       y < -2048||y>2048||!Double.isFinite(radius)||radius<=0||radius>128)throw new IllegalArgumentException("area");
   }
   public boolean contains(String dimension,double x,double y,double z){
+   if(box!=null)return this.dimension.equals(dimension)&&box.contains(x,y,z);
    double dx=this.x-x,dy=this.y-y,dz=this.z-z;
    return this.dimension.equals(dimension)&&Double.isFinite(dx)&&Double.isFinite(dy)&&Double.isFinite(dz)&&dx*dx+dy*dy+dz*dz<=radius*radius;
   }
  }
  public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions){
   public void validate(){
-   if(key==null||!key.matches("[a-zA-Z0-9_.:/-]{1,128}")||area==null||conditions==null||actions==null||actions.isEmpty())throw new IllegalArgumentException("event");
+   if(key==null||!key.matches("[a-zA-Z0-9_.:/-]{1,128}")||area==null||conditions==null||actions==null)throw new IllegalArgumentException("event");
    area.validate();StoryRules.validate(conditions,actions);
   }
  }

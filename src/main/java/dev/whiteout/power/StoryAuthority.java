@@ -24,6 +24,7 @@ public final class StoryAuthority {
  private StoryAuthority(){}
  public static void register(){
   if(registered)return;registered=true;
+  StoryAuthorityNetwork.register();
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{BUDGETS.remove(h.getPlayer());WARNINGS.remove(h.getPlayer());});
   ServerLifecycleEvents.SERVER_STOPPED.register(s->{CATALOGS.remove(s);BUDGETS.clear();WARNINGS.clear();});
   CommandRegistrationCallback.EVENT.register((dispatcher,registry,environment)->dispatcher.register(literal("whiteout")
@@ -57,13 +58,26 @@ public final class StoryAuthority {
   long tick=Integer.toUnsignedLong(player.getServer().getTicks());
   if(!BUDGETS.computeIfAbsent(player,p->new StoryRequestPolicy.Budget()).take(tick))return false;
   try{
-   if(!player.isAlive()||player.isSpectator())throw new IllegalArgumentException("player state");
    StoryEventCatalog.Event event=catalog(player.getServer()).resolve(packet.data());
+   execute(player,event.key());
+  }catch(Exception failure){denied(player,failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage());}
+  return false;
+ }
+ public static StoryReceipts.Outcome execute(ServerPlayerEntity player,String key){
+  if(!player.getServer().isOnThread())throw new IllegalStateException("Story requests require server thread");
+  try{
+   if(!player.isAlive()||player.isSpectator())throw new IllegalArgumentException("player state");
+   StoryEventCatalog definitions=catalog(player.getServer());
+   if(definitions.invalid())throw new IllegalStateException("invalid server catalog");
+   StoryEventCatalog.Event event=definitions.find(key);
+   if(event==null)throw new IllegalArgumentException("unregistered story key");
    if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
    var result=StoryCommitTransaction.apply(store,event);
-   if(result==StoryCommitTransaction.Result.COMMITTED)WhiteoutNetwork.syncAll(player.getServer());
-  }catch(Exception failure){denied(player,failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage());}
-  return false;
+   // A delivery error does not turn a committed transaction into a rejected one.
+   try{if(result==StoryCommitTransaction.Result.COMMITTED)WhiteoutNetwork.syncAll(player.getServer());else WhiteoutNetwork.sync(player);}
+   catch(RuntimeException failure){LOG.warn("Story state committed/read but snapshot delivery failed",failure);}
+   return StoryReceipts.Outcome.valueOf(result.name());
+  }catch(Exception failure){denied(player,failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage());return StoryReceipts.Outcome.DENIED;}
  }
 }

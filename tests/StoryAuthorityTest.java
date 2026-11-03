@@ -22,6 +22,13 @@ public final class StoryAuthorityTest {
   check(!event.area().contains("minecraft:overworld",4.01,72,3),"distance denied");
   check(!event.area().contains("minecraft:the_nether",1,72,3),"dimension denied");
   check(!event.area().contains("minecraft:overworld",Double.NaN,72,3),"NaN denied");
+  var box=new StoryEventCatalog.Box(1,2,3,4,5,6);box.validate();
+  check(box.contains(1,2,3)&&box.contains(3.99,4.99,5.99)&&!box.contains(4,3,4),"exact half-open box");
+  check(!box.contains(Double.NaN,3,4),"box NaN denied");
+  var visual=new StoryEventCatalog.Event("visual",false,event.area(),List.of(),List.of());
+  check(StoryCommitTransaction.apply(Map.of(),Set.of(),visual,(v,c)->{throw new AssertionError("visual event saved unchanged state");})==StoryCommitTransaction.Result.COMMITTED,"no needless serialization");
+  var onceOnly=new StoryEventCatalog.Event("once_only",true,event.area(),List.of(),List.of());
+  StoryCommitTransaction.apply(Map.of(),Set.of(),onceOnly,(v,c)->check(c.contains("once_only"),"pure dialogue once retained"));
   Map<String,StoryRules.Value> variables=new HashMap<>();variables.put("chapter",StoryRules.Value.of(1));variables.put("unrelated",StoryRules.Value.of(true));
   Set<String> completed=new HashSet<>(Set.of("other:scene"));int[] saves={0};
   StoryCommitTransaction.Writer write=(v,c)->{saves[0]++;check(v.get("chapter").integer==2,"canonical action");check(v.get("unrelated").bool,"unrelated variable retained");check(c.containsAll(Set.of("other:scene","test:bridge")),"once and unrelated keys retained");};
