@@ -42,22 +42,27 @@ public final class CrisisScenes {
   try{
    if(Files.size(path)>262144)throw new IllegalArgumentException("scene catalog size");
    Catalog catalog=new Gson().fromJson(Files.readString(path),Catalog.class);
+   scenes.putAll(validateCatalog(catalog,key->StoryAuthority.definition(server,key)));
+  }catch(Exception failure){scenes.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
+ }
+ public static Map<String,Scene> validateCatalog(Catalog catalog,java.util.function.Function<String,StoryEventCatalog.Event> lookup){
+   Map<String,Scene> result=new LinkedHashMap<>();
    if(catalog==null||catalog.schema()!=1||catalog.scenes()==null||catalog.scenes().size()>8)throw new IllegalArgumentException("scene catalog schema/count");
    Set<String> events=new HashSet<>();
    for(Scene scene:catalog.scenes()){
-    scene.validate();if(scenes.putIfAbsent(scene.runtimeId(),scene)!=null)throw new IllegalArgumentException("duplicate scene");
+    scene.validate();if(result.putIfAbsent(scene.runtimeId(),scene)!=null)throw new IllegalArgumentException("duplicate scene");
     for(Stage phase:scene.phases()){
      if(!events.add(phase.event()))throw new IllegalArgumentException("phase event shared by scenes");
-     var event=StoryAuthority.definition(server,phase.event());
+     var event=Objects.requireNonNull(lookup.apply(phase.event()));event.validate();
      if(!event.once()||!event.serverOnly()||!event.area().dimension().equals(scene.dimension()))throw new IllegalArgumentException("phase needs server-only Once event in scene dimension");
      if(!event.scenes().isEmpty())throw new IllegalArgumentException("nested scene requests in phases are not supported");
     }
     if(scene.resetEvent()!=null){
-     var reset=StoryAuthority.definition(server,scene.resetEvent());
-     if(!reset.serverOnly()||reset.once()||!reset.scenes().isEmpty())throw new IllegalArgumentException("reset needs repeatable server-only event without scene requests");
+     var reset=Objects.requireNonNull(lookup.apply(scene.resetEvent()));reset.validate();
+     if(!reset.serverOnly()||reset.once()||!reset.scenes().isEmpty()||reset.world()!=null)throw new IllegalArgumentException("reset needs repeatable server-only event without scene requests/world conditions");
     }
    }
-  }catch(Exception failure){scenes.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
+   return Collections.unmodifiableMap(result);
  }
  public boolean owns(String id){return scenes.containsKey(id);}
  public String status(){return "Authored scenes="+scenes.size()+", error="+error+", waiting="+reasons;}
