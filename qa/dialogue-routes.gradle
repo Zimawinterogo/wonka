@@ -3,7 +3,7 @@ gradle.projectsEvaluated {
  def p=gradle.rootProject
  p.tasks.register('compileRouteProbes',JavaCompile) {
   dependsOn 'classes'
-  source p.fileTree('tests') { include 'DialogueRouteBootstrap.java';include 'DialogueRouteClientProbe.java';include 'DialogueRouteServerProbe.java' }
+  source p.fileTree('tests') { include 'DialogueRouteBootstrap.java';include 'DialogueRouteClientProbe.java';include 'DialogueRouteServerProbe.java';include 'ScopedStoryProbe.java' }
   classpath=p.sourceSets.main.output+p.sourceSets.main.compileClasspath
   destinationDirectory=p.layout.buildDirectory.dir('route-probes')
   javaCompiler=p.javaToolchains.compilerFor { languageVersion=JavaLanguageVersion.of(21) }

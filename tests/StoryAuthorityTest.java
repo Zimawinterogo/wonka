@@ -95,7 +95,7 @@ public final class StoryAuthorityTest {
    Map<String,StoryRules.Value> reloadedVariables=JSON.fromJson(JSON.toJson(variables),new com.google.gson.reflect.TypeToken<Map<String,StoryRules.Value>>(){}.getType());
    Set<String> reloadedCompleted=new HashSet<>(Arrays.asList(JSON.fromJson(JSON.toJson(completed),String[].class)));
    check(StoryCommitTransaction.apply(reloadedVariables,reloadedCompleted,new StoryEventCatalog(path).find(event.key()),write)==StoryCommitTransaction.Result.ALREADY_COMPLETED,"restart keeps existing once keys");
-   for(String invalid:List.of("{broken","null","{\"schema\":3,\"events\":[]}",JSON.toJson(new StoryEventCatalog.Data(1,List.of(event,event))),json.replace("\"radius\":3.0","\"radius\":-1")," ".repeat(StoryEventCatalog.MAX_BYTES+1))){
+   for(String invalid:List.of("{broken","null","{\"schema\":4,\"events\":[]}",JSON.toJson(new StoryEventCatalog.Data(1,List.of(event,event))),json.replace("\"radius\":3.0","\"radius\":-1")," ".repeat(StoryEventCatalog.MAX_BYTES+1))){
     Files.writeString(path,invalid);var corrupt=new StoryEventCatalog(path);check(corrupt.invalid()&&corrupt.size()==0,"invalid catalog fails closed");check(Files.readString(path).equals(invalid),"invalid file preserved");
    }
   }finally{Files.deleteIfExists(path);Files.deleteIfExists(dir);}

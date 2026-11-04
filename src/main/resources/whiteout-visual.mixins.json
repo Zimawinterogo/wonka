@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "dev.whiteout.power.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": ["ZoneHistoryMixin"],
+  "mixins": ["ZoneHistoryMixin", "PlayerStoryDataMixin", "StoryStoreMixin", "ScopedCheckpointMixin"],
   "client": [
     "MigratedTriggerMixin",
     "StoryRuntimeAuthorityMixin",

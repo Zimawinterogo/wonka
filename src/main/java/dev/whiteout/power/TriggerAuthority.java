@@ -38,7 +38,7 @@ public final class TriggerAuthority {
   if(!live(p)||!ServerPlayNetworking.canSend(p,Notice.ID)){sessions.remove(p);return null;}
   var catalog=StoryAuthority.catalog(p.getServer());var current=sessions.get(p);
   if(current==null&&catalog.rules().isEmpty())return null;
-  long epoch=Store.get(p.getServer()).data.storyResetEpoch;
+  long epoch=ScopedStory.epoch(Store.get(p.getServer()).data,p.getUuid());
   if(current==null||current.catalog()!=catalog||current.world()!=p.getServerWorld()||current.epoch()!=epoch){
    current=new Session(catalog,p.getServerWorld(),epoch,new TriggerEvidence());sessions.put(p,current);
    String keys=String.join("\n",catalog.rules().stream().map(TriggerEvidence.Rule::key).toList());
@@ -48,7 +48,7 @@ public final class TriggerAuthority {
  }
  private static boolean eligible(ServerPlayerEntity p,Session session,String key){
   var store=Store.get(p.getServer());
-  return store.error==null&&session.catalog().eligible(key,store.data,new StoryWorldSource(p,store.data));
+  return store.error==null&&session.catalog().eligible(key,store.data,p);
  }
  private static boolean position(TriggerEvidence.Rule r,ServerPlayerEntity p){
   if(r.binding().zone())return r.area().dimension().equals(body(p).dimension())&&body(p).intersects(r.area())==(r.binding().type()==TriggerEvidence.Kind.ENTER_BOX);

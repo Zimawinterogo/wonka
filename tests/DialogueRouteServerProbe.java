@@ -4,10 +4,11 @@ import net.minecraft.registry.DynamicRegistryManager;
 import io.netty.buffer.Unpooled;
 
 public class DialogueRouteServerProbe {
- public static void main(String[] args){
+ public static void main(String[] args)throws Exception{
   net.minecraft.SharedConstants.createGameVersion();net.minecraft.Bootstrap.initialize();
   DialogueRouteNetwork.register();
   StoryAuthority.register();
+  ScopedStoryProbe.run();
   long guards=java.util.Arrays.stream(dev.whiteout.net.WhiteoutNetwork.class.getDeclaredMethods())
    .filter(m->m.getName().contains("whiteout$before")).count();
   if(guards!=1)throw new AssertionError("Server story authority Mixin was not applied: "+guards);

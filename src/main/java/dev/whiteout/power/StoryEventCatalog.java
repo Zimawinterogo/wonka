@@ -34,15 +34,18 @@ public final class StoryEventCatalog {
    return this.dimension.equals(dimension)&&Double.isFinite(dx)&&Double.isFinite(dy)&&Double.isFinite(dz)&&dx*dx+dy*dy+dz*dz<=radius*radius;
   }
  }
- public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger){
+ public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger,ScopedStory.Scope scope,String checkpoint){
+  public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger){this(key,once,area,conditions,actions,objectives,world,serverOnly,scenes,trigger,ScopedStory.Scope.WORLD,null);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes){this(key,once,area,conditions,actions,objectives,world,serverOnly,scenes,null);}
-  public Event { objectives=objectives==null?List.of():List.copyOf(objectives);scenes=scenes==null?List.of():List.copyOf(scenes); }
+  public Event { scope=Objects.requireNonNullElse(scope,ScopedStory.Scope.WORLD);objectives=objectives==null?List.of():List.copyOf(objectives);scenes=scenes==null?List.of():List.copyOf(scenes); }
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly){this(key,once,area,conditions,actions,objectives,world,serverOnly,List.of());}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions){this(key,once,area,conditions,actions,List.of(),null,false);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives){this(key,once,area,conditions,actions,objectives,null,false);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world){this(key,once,area,conditions,actions,objectives,world,false);}
   public void validate(){
    if(key==null||!key.matches("[a-zA-Z0-9_.:/-]{1,128}")||(area==null&&trigger==null)||conditions==null||actions==null)throw new IllegalArgumentException("event");
+   if(scope==ScopedStory.Scope.PLAYER&&(serverOnly||!scenes.isEmpty()))throw new IllegalArgumentException("Director events require WORLD scope");
+   if(checkpoint!=null){StoryRules.name(checkpoint);if(serverOnly)throw new IllegalArgumentException("checkpoint requires a player position");}
    if(trigger!=null){
     if(serverOnly||trigger.zone()&&(area==null||area.box()==null))throw new IllegalArgumentException("invalid trigger binding");
     String prefix=trigger.type()==TriggerEvidence.Kind.CHOICE?"dialogue_choice:":"cutscene_trigger:";
@@ -58,8 +61,11 @@ public final class StoryEventCatalog {
  private final Map<String,String> events=new LinkedHashMap<>();
  private final Map<String,TriggerEvidence.Rule> rules=new LinkedHashMap<>();
  private final Map<String,Event> boundEvents=new HashMap<>();
- boolean eligible(String key,dev.whiteout.Store.Data data,StoryWorldConditions.Source world){
+ boolean eligible(String key,dev.whiteout.Store.Data root,net.minecraft.server.network.ServerPlayerEntity player){
   Event event=boundEvents.get(key);
+  if(event==null)return false;
+  var data=ScopedStory.read(root,event.scope(),player.getUuid());
+  var world=new StoryWorldSource(player,data);
   return event!=null&&!(event.once()&&data.completedEvents.contains(key))
    &&StoryRules.matches(data.storyVariables,event.conditions())
    &&StoryWorldConditions.evaluate(event.world(),world)==WinterCrisisConditions.Truth.TRUE;
@@ -71,13 +77,21 @@ public final class StoryEventCatalog {
   if(!Files.exists(path))return;
   try{
    if(Files.size(path)>MAX_BYTES)throw new IOException("size");
-   Data data=JSON.fromJson(Files.readString(path),Data.class);
-   if(data==null||(data.schema()!=1&&data.schema()!=2)||data.events()==null||data.events().size()>MAX_EVENTS)throw new IllegalArgumentException("schema/events");
+   var root=JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+   for(var entry:root.getAsJsonArray("events")){
+    var object=entry.getAsJsonObject();
+    if(object.has("scope")||object.has("checkpoint")){
+     if(root.get("schema").getAsInt()!=3&&(object.has("checkpoint")||!"WORLD".equals(object.get("scope").getAsString())))throw new IllegalArgumentException("scoped progress requires schema 3");
+     if(object.has("scope"))ScopedStory.Scope.valueOf(object.get("scope").getAsString());
+    }
+   }
+   Data data=JSON.fromJson(root,Data.class);
+   if(data==null||(data.schema()!=1&&data.schema()!=2&&data.schema()!=3)||data.events()==null||data.events().size()>MAX_EVENTS)throw new IllegalArgumentException("schema/events");
    for(Event event:data.events()){
     if(event==null)throw new IllegalArgumentException("null event");event.validate();
     if(events.putIfAbsent(event.key(),JSON.toJson(event))!=null)throw new IllegalArgumentException("duplicate key");
     if(event.trigger()!=null){
-     if(data.schema()!=2)throw new IllegalArgumentException("trigger bindings require schema 2");
+     if(data.schema()<2)throw new IllegalArgumentException("trigger bindings require schema 2 or later");
      boundEvents.put(event.key(),event);
      rules.put(event.key(),new TriggerEvidence.Rule(event.key(),event.area(),event.trigger()));
     }

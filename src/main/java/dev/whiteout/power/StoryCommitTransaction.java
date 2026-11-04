@@ -13,6 +13,7 @@ public final class StoryCommitTransaction {
  }
  public static Result apply(Store store,StoryEventCatalog.Event event)throws Exception {
   if(store.error!=null)throw new IllegalStateException("story store is read-only");
+  if(event.scope()!=ScopedStory.Scope.WORLD||event.checkpoint()!=null)throw new IllegalArgumentException("missing story context");
   if(!event.objectives().isEmpty()||!event.scenes().isEmpty())return apply(store,event,s->{});
   return apply(store.data.storyVariables,store.data.completedEvents,event,(variables,completed)->{
    var oldVariables=store.data.storyVariables;var oldCompleted=store.data.completedEvents;
@@ -24,13 +25,18 @@ public final class StoryCommitTransaction {
  /** Server-only extension point for committing Director markers with the event, in one Store save. */
  public static Result apply(Store store,StoryEventCatalog.Event event,java.util.function.Consumer<StoryObjectiveActions.State> markers)throws Exception {
   if(store.error!=null)throw new IllegalStateException("story store is read-only");
-  event.validate();var original=StoryObjectiveActions.State.capture(store.data);
+  if(event.scope()!=ScopedStory.Scope.WORLD||event.checkpoint()!=null)throw new IllegalArgumentException("missing story context");
+  return stage(store.data,event,markers,()->store.save());
+ }
+ @FunctionalInterface interface Save {void run() throws Exception;}
+ static Result stage(Store.Data target,StoryEventCatalog.Event event,java.util.function.Consumer<StoryObjectiveActions.State> markers,Save save)throws Exception{
+  event.validate();var original=StoryObjectiveActions.State.capture(target);
   if(event.once()&&original.completed.contains(event.key()))return Result.ALREADY_COMPLETED;
   if(!StoryRules.matches(original.variables,event.conditions()))return Result.CONDITIONS_FALSE;
   var next=original.copy();next.variables=StoryRules.apply(next.variables,event.actions());next.apply(event.objectives());
   StorySceneActions.apply(next,event.scenes());
   if(event.once())next.completed.add(event.key());markers.accept(next);StoryRules.validateVariables(next.variables);
-  next.publish(store.data);try{store.save();}catch(Exception failure){original.publish(store.data);throw failure;}
+  next.publish(target);try{save.run();}catch(Exception failure){original.publish(target);throw failure;}
   return Result.COMMITTED;
  }
  public static Result apply(Map<String,StoryRules.Value> variables,Set<String> completed,

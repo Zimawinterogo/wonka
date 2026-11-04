@@ -1,0 +1,31 @@
+package dev.whiteout.power.mixin;
+
+import dev.whiteout.Store;
+import dev.whiteout.power.ScopedStory;
+import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.injection.*;
+import org.spongepowered.asm.mixin.injection.callback.*;
+import java.nio.file.*;
+
+@Mixin(value=Store.class,remap=false)
+public abstract class StoryStoreMixin {
+ @Shadow public Store.Data data;
+ @Shadow public String error;
+ @Redirect(method="save",at=@At(value="INVOKE",target="Ljava/nio/file/Files;writeString(Ljava/nio/file/Path;Ljava/lang/CharSequence;Ljava/nio/charset/Charset;[Ljava/nio/file/OpenOption;)Ljava/nio/file/Path;"))
+ private Path whiteout$flush(Path path,CharSequence content,java.nio.charset.Charset charset,OpenOption[] options)throws java.io.IOException{
+  Files.writeString(path,content,charset,options);
+  try(var channel=java.nio.channels.FileChannel.open(path,StandardOpenOption.WRITE)){channel.force(true);}
+  return path;
+ }
+ @Inject(method="validateData",at=@At("RETURN"))
+ private void whiteout$validatePlayers(CallbackInfo ci){ScopedStory.validate(data);}
+ @Inject(method="networkSnapshot",at=@At("RETURN"))
+ private void whiteout$privateProgress(CallbackInfoReturnable<Store.Data> ci){
+  ((ScopedStory.Players)(Object)ci.getReturnValue()).whiteout$players().clear();
+ }
+ @Inject(method="<init>(Ljava/nio/file/Path;)V",at=@At("RETURN"))
+ private void whiteout$incompleteSave(Path path,CallbackInfo ci){
+  if(!Files.exists(path)&&(Files.exists(path.resolveSibling(path.getFileName()+".bak"))||Files.exists(path.resolveSibling(path.getFileName()+".tmp"))))
+   error="Missing Store file with recovery files present: "+path.getFileName();
+ }
+}
