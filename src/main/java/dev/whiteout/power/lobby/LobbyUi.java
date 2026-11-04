@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 final class LobbyUi {
  private LobbyUi(){}
  private static Identifier tex(String name){return Identifier.of("whiteout","textures/gui/board/"+name+".png");}
- static final Identifier ROOM=tex("room"),CORK=tex("cork"),FRAME=tex("frame"),PAPER=tex("paper"),CHALK=tex("paper_dark"),
+ static final Identifier SCENE=tex("story_preview"),ROOM=tex("room"),CORK=tex("cork"),FRAME=tex("frame"),PAPER=tex("paper"),CHALK=tex("paper_dark"),
   STICKY=tex("sticky"),STICKY_PINK=tex("sticky_pink"),BUTTON=tex("button"),START=tex("button_start"),
   PHOTO=tex("photo_frame"),PIN=tex("pin"),TAPE=tex("tape"),STATUS=tex("status"),ICONS=tex("icons"),TOGGLE=tex("toggle");
  // Cold steel, readable off-white and an emergency-red launch accent.
