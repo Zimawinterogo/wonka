@@ -53,12 +53,12 @@ final class PhotoScreen extends SharpScreen{
  }
  static void draw(DrawContext d,Identifier id,int cx,int cy,int w,int h,int angle){
   var m=d.getMatrices();m.push();m.translate(cx,cy,0);m.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(angle));
-  d.fill(-w/2-3,-h/2-3,w/2+3,h/2+6,0xffe9dfcc);
+  LobbyUi.polaroid(d,-w/2,-h/2,w,h);
   if(id!=null)d.drawTexture(id,-w/2,-h/2,w,h,0,0,W,H,W,H);else {
    d.fill(-w/2,-h/2,w/2,h/2,0xff9ca5a3);
    for(int col=-w/2;col<w/2;col++){double t=(col+w/2.0)/w;int ridge=(int)(h*(.16*Math.cos(8*t)+.08*Math.cos(16*t)));d.fill(col,ridge,col+1,h/2,0xffd8d9cf);}
   }
-  d.fill(-2,-h/2-3,2,-h/2+1,0xff8c4833);m.pop();
+  LobbyUi.pin(d,0,-h/2-3);m.pop();
  }
  static void mainPhoto(DrawContext d,BoardNetwork.View data,int cx,int cy){
   var photos=pictures(data);if(photos.isEmpty())return;var p=photos.getFirst();draw(d,cache.get(p.hash()),cx+p.x()/3,cy+p.y()/3,70,52,p.angle());
@@ -70,7 +70,7 @@ final class PhotoScreen extends SharpScreen{
    draw(d,cache.get(p.hash()),cx+19+col*22+p.x()/6,cy-16+row*26+p.y()/5,19,15,p.angle());}
  }
  private void select(int i){var pics=pictures(data);index=Math.clamp(i,0,Math.max(0,pics.size()-1));if(!pics.isEmpty()){var p=pics.get(index);x=p.x();y=p.y();angle=p.angle();}}
- private void button(String name,int x,int y,int w,Runnable action){addDrawableChild(ButtonWidget.builder(Text.literal(name),b->action.run()).dimensions(x,y,w,19).build());}
+ private void button(String name,int x,int y,int w,Runnable action){addDrawableChild(LobbyUi.button(Text.literal(name),x,y,w,19,action));}
  private void edit(String op){ClientPlayNetworking.send(new Edit(data.token(),data.revision(),index,op,x,y,angle));}
  private void choose(){
   if(choosing)return;choosing=true;var mc=client;status="Выбор PNG или JPG…";
@@ -111,9 +111,13 @@ final class PhotoScreen extends SharpScreen{
  }
  @Override public boolean mouseScrolled(double mx,double my,double h,double v){if(editor&&source==null){angle=Math.clamp(angle+(int)Math.signum(v),-15,15);return true;}return super.mouseScrolled(mx,my,h,v);}
  @Override public void render(DrawContext d,int mx,int my,float dt){
-  d.fill(0,0,width,height,0xec30271f);var pics=pictures(data);
+  LobbyUi.backdrop(d,width,height);var frame=LobbyUi.Box.centered(width,height,398,230);LobbyUi.board(d,frame);
+  LobbyUi.paper(d,width/2-83,height/2-78,166,125);
+  LobbyUi.pin(d,width/2-71,height/2-72);var pics=pictures(data);
   draw(d,source!=null?preview:pics.isEmpty()?null:cache.get(pics.get(index).hash()),width/2+(source!=null?0:x),height/2-18+(source!=null?0:y),136,102,source!=null?0:angle);
-  d.drawCenteredTextWithShadow(textRenderer,status.isEmpty()?"Фотографии · "+pics.size()+" / 5":status,width/2,7,0xffdfcfb8);super.render(d,mx,my,dt);
+  LobbyUi.fit(d,textRenderer,status.isEmpty()?"ФОТОГРАФИИ / "+pics.size()+" ИЗ 5":status,frame.x()+18,frame.y()+12,frame.w()-36,LobbyUi.LIGHT,false,1);
+  LobbyUi.caption(d,textRenderer,editor?"ЛКМ: перетащить / КОЛЕСО: поворот":"ГАЛЕРЕЯ ИСТОРИИ",frame.x()+17,frame.bottom()-12,frame.w()-34,LobbyUi.LIGHT_DIM);
+  super.render(d,mx,my,dt);
  }
  @Override public void removed(){if(preview!=null){client.getTextureManager().destroyTexture(preview);preview=null;}}
  @Override public void close(){client.setScreen(new BoardScreen(data));}
