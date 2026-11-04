@@ -13,7 +13,7 @@ public final class StoryAuthorityClient {
  private static long tick;
  private static Object world;
  private static BooleanSupplier valid,ready,present;
- private static String key,deferredKey;private static Runnable deferred;
+ private static String key,deferredKey,earlyAgreement;private static Runnable deferred;
  private static Consumer<Boolean> finished;
  private StoryAuthorityClient(){}
  public static void register(){
@@ -29,7 +29,8 @@ public final class StoryAuthorityClient {
    if(outcome==StoryReceipts.Outcome.WAITING){
     var check=valid;var action=present;var expected=world;var cb=finished;deferredKey=key;
     deferred=()->{if(c.world==expected&&check.getAsBoolean()){boolean ok=action.getAsBoolean();if(cb!=null)cb.accept(ok);}};
-    reset();Bridge.message("Выбор сохранён. Ожидание решения напарника.");return;
+    boolean alreadyAgreed=key.equals(earlyAgreement);reset();
+    if(alreadyAgreed)agreed(deferredKey);else Bridge.message("Выбор сохранён. Ожидание решения напарника.");return;
    }
    if(outcome!=StoryReceipts.Outcome.COMMITTED){finish(false);return;}
    if(!valid.getAsBoolean()||SESSION.presentationExpired(tick)){finish(false);return;}
@@ -40,14 +41,14 @@ public final class StoryAuthorityClient {
    if(callback!=null)callback.accept(success);
   });
  }
- static void agreed(String k){if(k.equals(deferredKey)&&deferred!=null){var run=deferred;deferred=null;deferredKey=null;run.run();}}
+ static void agreed(String k){if(k.equals(deferredKey)&&deferred!=null){var run=deferred;deferred=null;deferredKey=null;run.run();}else if(SESSION.busy()&&k.equals(key))earlyAgreement=k;}
  private static void send(StoryReceipts.Request request){
   try{ClientPlayNetworking.send(new StoryAuthorityNetwork.Request(request.token(),request.key()));}
   catch(RuntimeException failure){finish(false);}
  }
  private static void finish(boolean value){var callback=finished;reset();if(callback!=null)callback.accept(value);}
  public static boolean busy(){return SESSION.busy();}
- public static void reset(){SESSION.clear();world=null;valid=ready=present=null;finished=null;}
+ public static void reset(){SESSION.clear();earlyAgreement=null;world=null;valid=ready=present=null;finished=null;}
  public static boolean request(String key,BooleanSupplier stillValid,BooleanSupplier canPresent,BooleanSupplier action,Consumer<Boolean> callback){
   var mc=MinecraftClient.getInstance();
   if(mc==null||mc.player==null||mc.world==null||SESSION.busy()||!ClientPlayNetworking.canSend(StoryAuthorityNetwork.Request.ID))return false;
