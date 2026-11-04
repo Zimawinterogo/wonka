@@ -10,6 +10,7 @@ import net.minecraft.util.Identifier;
 public final class BoardScreen extends SharpScreen {
  private final BoardNetwork.View data;
  private boolean editing;
+ private int page;
  private final TextFieldWidget[] fields=new TextFieldWidget[5];
  private static final String[] NAMES={"title","description","author","duration","note"};
  private static final int[] LIMIT={80,320,64,48,160};
@@ -23,7 +24,15 @@ public final class BoardScreen extends SharpScreen {
  private int top(){return Math.max(4,(height-200)/2);}
  private String[] values(){var c=data.card();return c==null?new String[]{"","","","",""}:new String[]{c.title(),c.description(),c.author(),c.duration(),c.note()};}
  private ButtonWidget button(Text text,int x,int y,int width,Runnable action){
-  return addDrawableChild(ButtonWidget.builder(text,b->action.run()).dimensions(x,y,width,20).build());
+  return addDrawableChild(new ButtonWidget(x,y,width,20,text,b->action.run(),supplier->supplier.get()){
+   @Override protected void renderWidget(DrawContext d,int mx,int my,float dt){
+    int px=getX(),py=getY(),w=getWidth();
+    d.fill(px+2,py+3,px+w+2,py+21,0x77413423);
+    d.fill(px,py,px+w,py+20,!active?0xffb3a68e:isHovered()||isFocused()?0xfff6e3b7:0xffdbc89c);
+    d.fill(px+3,py+3,px+5,py+5,0xff85553c);
+    d.drawText(textRenderer,getMessage(),px+(w-textRenderer.getWidth(getMessage()))/2,py+6,active?0x342a21:0x6b6053,false);
+   }
+  });
  }
  private void send(LobbyState.Card card){ClientPlayNetworking.send(new BoardNetwork.Change(data.token(),data.revision(),card));close();}
  @Override protected void init(){
@@ -37,7 +46,19 @@ public final class BoardScreen extends SharpScreen {
    save.active=!fields[0].getText().isBlank();fields[0].setChangedListener(v->save.active=!v.isBlank());setInitialFocus(fields[0]);return;
   }
   if(data.editor()&&!data.started())button(Text.literal("⚙"),x+w-34,y+6,26,()->{editing=true;clearAndInit();}).setTooltip(Tooltip.of(tr("edit")));
+  if(lines().size()>9){
+   button(Text.literal("‹"),x+10,y+166,24,()->{page--;clearAndInit();}).active=page>0;
+   button(Text.literal("›"),x+w-34,y+166,24,()->{page++;clearAndInit();}).active=(page+1)*9<lines().size();
+  }
   var start=button(tr(data.started()?"started":"start"),x+w/2-81,y+167,162,()->send(null));start.active=data.card()!=null&&!data.started();
+ }
+ private java.util.List<net.minecraft.text.OrderedText> lines(){
+  var lines=new java.util.ArrayList<net.minecraft.text.OrderedText>();var v=values();
+  for(int i=1;i<v.length;i++)if(!v[i].isBlank()){
+   Text line=i==1?Text.literal(v[i]):tr(NAMES[i]).copy().append(" · ").append(v[i]);
+   lines.addAll(textRenderer.wrapLines(line,w()-44));
+  }
+  return lines;
  }
  @Override public void render(DrawContext d,int mx,int my,float dt){
   int x=left(),y=top(),w=w();
@@ -53,9 +74,9 @@ public final class BoardScreen extends SharpScreen {
    d.drawText(textRenderer,c==null?tr("board"):Text.literal(textRenderer.trimToWidth(c.title(),w-74)),x+24,y+16,0x382c20,false);
    int row=y+38;
    if(c==null)d.drawTextWrapped(textRenderer,tr("empty"),x+22,row,w-44,0x504336);
-   else for(String line:new String[]{c.description(),c.author(),c.duration(),c.note()}){
-    if(line.isBlank())continue;
-    for(var part:textRenderer.wrapLines(Text.literal(line),w-44)){if(row>y+144)break;d.drawText(textRenderer,part,x+22,row,0x504336,false);row+=11;}row+=3;
+   else{
+    var lines=lines();page=Math.min(page,Math.max(0,(lines.size()-1)/9));
+    for(int i=page*9;i<Math.min(lines.size(),(page+1)*9);i++){d.drawText(textRenderer,lines.get(i),x+22,row,0x504336,false);row+=12;}
    }
   }
   super.render(d,mx,my,dt);

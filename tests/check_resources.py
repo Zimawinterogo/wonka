@@ -18,8 +18,10 @@ for p in (a/'blockstates').glob('*.json'):
  if 'multipart' in states:
   variants={str(i):part['apply'] for i,part in enumerate(states['multipart'])}
  else:
-  expected={'emergency_lamp':2,'rotten_spruce_planks':1,'frost_window':4,'wall_thermometer':4,'barricade':36}.get(p.stem,8)
+  expected={'story_board':16,'emergency_lamp':2,'rotten_spruce_planks':1,'frost_window':4,'wall_thermometer':4,'barricade':36}.get(p.stem,8)
   assert len(variants)==expected,p
+ if p.stem=='story_board':
+  assert set(variants)=={f'facing={f},part={i}' for f in ('north','south','west','east') for i in range(4)}
  for v in variants.values():
   namespace,path=v['model'].split(':',1)
   if namespace=='minecraft':
