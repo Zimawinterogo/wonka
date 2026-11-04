@@ -84,7 +84,7 @@ def exercise_duo(command, wait):
     command("forceload add -16 -16 16 16")
     command("fill -16 63 -4 15 63 7 minecraft:stone")
     command("fill -16 64 -4 15 67 7 minecraft:air")
-    command(f"player {name} spawn at 12 64 1 in overworld")
+    command(f"execute in minecraft:overworld positioned 12 64 1 run player {name} spawn")
     wait("joined the game", 90)
     command(f"gamemode creative {name}")
     command("scoreboard objectives add qa dummy")
