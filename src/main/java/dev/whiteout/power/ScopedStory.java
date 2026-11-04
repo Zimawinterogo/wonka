@@ -10,6 +10,8 @@ import java.util.*;
 public final class ScopedStory {
  private ScopedStory(){}
  public enum Scope { WORLD, PLAYER }
+ // Gson must be able to recover both types even when Mixin erases a merged field's generic signature.
+ public static final class Profiles extends LinkedHashMap<UUID,Profile>{}
  public interface Players {Map<UUID,Profile> whiteout$players();}
  public record Position(String dimension,double x,double y,double z,float yaw,float pitch){}
  public record Profile(StoryObjectiveActions.State story,Map<String,CheckpointRules.Checkpoint> checkpoints,long epoch,long noticeWorldSerial){

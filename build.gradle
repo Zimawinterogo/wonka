@@ -60,7 +60,7 @@ tasks.register('assembleWhiteout') {
   def patchZip=new java.util.zip.ZipFile(tasks.remapJar.archiveFile.get().asFile)
   try {
    patchZip.entries().each { e->
-    if(!e.directory&&(e.name=='dev/whiteout/MusicCatalog.class'||e.name=='dev/whiteout/client/CustomMusicManager.class'||e.name=='dev/whiteout/client/MusicLibraryScreen.class'||e.name.startsWith('dev/whiteout/power/')||e.name.startsWith('assets/whiteout/')||e.name.startsWith('data/whiteout/')||e.name.startsWith('data/minecraft/tags/block/mineable/')||e.name=='whiteout-visual.mixins.json'||e.name=='whiteout-visual-refmap.json')) {
+    if(!e.directory&&(e.name=='dev/whiteout/StoryStoreReader.class'||e.name=='dev/whiteout/MusicCatalog.class'||e.name=='dev/whiteout/client/CustomMusicManager.class'||e.name=='dev/whiteout/client/MusicLibraryScreen.class'||e.name.startsWith('dev/whiteout/power/')||e.name.startsWith('assets/whiteout/')||e.name.startsWith('data/whiteout/')||e.name.startsWith('data/minecraft/tags/block/mineable/')||e.name=='whiteout-visual.mixins.json'||e.name=='whiteout-visual-refmap.json')) {
      def data=patchZip.getInputStream(e).bytes
      if(entries.containsKey(e.name)&&(e.name=='assets/whiteout/sounds.json'||e.name.startsWith('assets/whiteout/lang/'))) {
       def merged=json.parse(entries[e.name]);merged.putAll(json.parse(data));data=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(merged)).getBytes('UTF-8')
