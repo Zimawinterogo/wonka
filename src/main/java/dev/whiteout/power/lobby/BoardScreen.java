@@ -4,110 +4,137 @@ import dev.whiteout.power.SharpScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.*;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import java.util.*;
 
 public final class BoardScreen extends SharpScreen {
  private final BoardNetwork.View data;
  private boolean editing,detail;
- private boolean started(){return data.token().equals(PartyScreen.token)&&PartyScreen.state!=null?PartyScreen.state.started():data.started();}
- void changed(java.util.UUID token){if(data.token().equals(token)&&!editing)clearAndInit();}
  private int page;
  private final TextFieldWidget[] fields=new TextFieldWidget[5];
  private static final String[] NAMES={"title","description","author","duration","note"};
+ private static final String[] LABELS={"Название","Описание","Автор","Длительность","Примечание"};
  private static final int[] LIMIT={80,320,64,48,160};
  private static Text tr(String key){return Text.translatable("board.whiteout."+key);}
  BoardScreen(BoardNetwork.View data){super(tr("board"));this.data=data;}
  public static void register(){
   AuthorScreen.register();PartyScreen.register();PhotoScreen.register();
-  ClientPlayNetworking.registerGlobalReceiver(BoardNetwork.View.ID,(msg,ctx)->ctx.client().execute(()->{PhotoScreen.opened(msg,ctx.client());ctx.client().setScreen(new BoardScreen(msg));}));
+  ClientPlayNetworking.registerGlobalReceiver(BoardNetwork.View.ID,(msg,ctx)->ctx.client().execute(()->{
+   PhotoScreen.opened(msg,ctx.client());ctx.client().setScreen(new BoardScreen(msg));
+  }));
  }
- private int w(){return Math.min(width-16,374);}
- private int left(){return (width-w())/2;}
- private int top(){return Math.max(4,(height-200)/2);}
+ private LobbyUi.Box board(){return LobbyUi.Box.centered(width,height,430,234);}
+ private boolean started(){return data.token().equals(PartyScreen.token)&&PartyScreen.state!=null?PartyScreen.state.started():data.started();}
+ void changed(UUID token){if(data.token().equals(token)&&!editing)clearAndInit();}
  private String[] values(){var c=data.card();return c==null?new String[]{"","","","",""}:new String[]{c.title(),c.description(),c.author(),c.duration(),c.note()};}
- private ButtonWidget button(Text text,int x,int y,int width,Runnable action){
-  return addDrawableChild(new ButtonWidget(x,y,width,20,text,b->action.run(),supplier->supplier.get()){
-   @Override protected void renderWidget(DrawContext d,int mx,int my,float dt){
-    int px=getX(),py=getY(),w=getWidth();
-    d.fill(px+2,py+3,px+w+2,py+21,0x77413423);
-    d.fill(px,py,px+w,py+20,!active?0xffb3a68e:isHovered()||isFocused()?0xfff6e3b7:0xffdbc89c);
-    d.fill(px+3,py+3,px+5,py+5,0xff85553c);
-    d.drawText(textRenderer,getMessage(),px+(w-textRenderer.getWidth(getMessage()))/2,py+6,active?0x342a21:0x6b6053,false);
-   }
-  });
+ private LobbyUi.Btn button(String text,int x,int y,int w,Runnable action){return addDrawableChild(LobbyUi.button(Text.literal(text),x,y,w,20,action));}
+ private LobbyUi.Btn startButton(String text,int x,int y,int w,Runnable action){return addDrawableChild(LobbyUi.primary(Text.literal(text),x,y,w,21,action));}
+ private void send(LobbyState.Card card){
+  long rev=card==null&&PartyScreen.state!=null?PartyScreen.state.revision():data.revision();
+  ClientPlayNetworking.send(new BoardNetwork.Change(data.token(),rev,card));close();
  }
- private void send(LobbyState.Card card){long rev=card==null&&PartyScreen.state!=null?PartyScreen.state.revision():data.revision();ClientPlayNetworking.send(new BoardNetwork.Change(data.token(),rev,card));close();}
  @Override protected void init(){
-  int x=left(),y=top(),w=w();
+  LobbyUi.Box b=board();int x=b.x(),y=b.y(),w=b.w(),h=b.h();
   if(editing){
-   var values=values();for(int i=0;i<5;i++){
-    var field=new TextFieldWidget(textRenderer,x+w/3,y+26+i*26,w-w/3-14,20,tr(NAMES[i]));
-    field.setMaxLength(LIMIT[i]);field.setText(values[i]);fields[i]=addDrawableChild(field);
+   String[] vals=values();
+   for(int i=0;i<5;i++){
+    TextFieldWidget f=new TextFieldWidget(textRenderer,x+105,y+42+i*25,w-125,18,tr(NAMES[i]));
+    f.setMaxLength(LIMIT[i]);f.setText(vals[i]);fields[i]=addDrawableChild(f);
    }
-   button(Text.literal("Сценарий"),x+8,y+167,75,()->client.setScreen(new AuthorScreen(data)));
-   if(data.card()!=null)button(Text.literal("Старт…"),x+w-76,y+167,66,()->client.setScreen(new PartyScreen(data,1)));
-   var save=button(tr("save"),x+w/2-46,y+167,92,()->send(new LobbyState.Card(fields[0].getText(),fields[1].getText(),fields[2].getText(),fields[3].getText(),fields[4].getText())));
-   save.active=!fields[0].getText().isBlank();fields[0].setChangedListener(v->save.active=!v.isBlank());setInitialFocus(fields[0]);return;
+   button("Сценарий",x+16,y+h-32,78,()->client.setScreen(new AuthorScreen(data)));
+   if(data.card()!=null)button("Старт...",x+97,y+h-32,75,()->client.setScreen(new PartyScreen(data,1)));
+   LobbyUi.Btn save=startButton("Сохранить",x+w-117,y+h-33,99,()->send(new LobbyState.Card(
+    fields[0].getText(),fields[1].getText(),fields[2].getText(),fields[3].getText(),fields[4].getText())));
+   save.active=!fields[0].getText().isBlank();
+   fields[0].setChangedListener(v->save.active=!v.isBlank());
+   setInitialFocus(fields[0]);return;
   }
   if(detail){
-   button(Text.literal("‹ Доска"),x+10,y+167,70,()->{detail=false;clearAndInit();});
-   if(data.editor()||!PhotoTransfer.pictures(data).isEmpty())button(Text.literal("Снимки"),x+w-82,y+167,72,()->client.setScreen(new PhotoScreen(data)));
-   if(lines().size()>8){button(Text.literal("‹"),x+w/2-26,y+167,24,()->{page--;clearAndInit();}).active=page>0;
-    button(Text.literal("›"),x+w/2+2,y+167,24,()->{page++;clearAndInit();}).active=(page+1)*8<lines().size();}return;
+   button("К доске",x+16,y+h-32,78,()->{detail=false;clearAndInit();});
+   if(data.editor()||!PhotoTransfer.pictures(data).isEmpty())button("Фотографии",x+w-120,y+h-32,103,()->client.setScreen(new PhotoScreen(data)));
+   int count=lines().size();if(count>9){
+    LobbyUi.Btn prev=button("‹",x+w/2-24,y+h-32,22,()->{page--;clearAndInit();});prev.active=page>0;
+    LobbyUi.Btn next=button("›",x+w/2+3,y+h-32,22,()->{page++;clearAndInit();});next.active=(page+1)*9<count;
+   }return;
   }
-  if(data.editor()&&!started()){var gear=button(Text.literal("⚙"),x+w-35,y+5,25,()->{editing=true;clearAndInit();});if(PersonalScreen.prefs().hints())gear.setTooltip(Tooltip.of(tr("edit")));}
+  if(data.editor()&&!started()){
+   LobbyUi.Btn edit=addDrawableChild(LobbyUi.iconButton(LobbyUi.ICON_GEAR,Text.literal(""),x+w-37,y+12,23,21,()->{editing=true;clearAndInit();}));
+   if(PersonalScreen.prefs().hints())edit.setTooltip(Tooltip.of(tr("edit")));
+  }
   if(data.card()!=null){
-   int right=x+w*56/100,rw=w-(right-x)-13;
-   button(Text.literal("Карточка истории"),x+16,y+121,right-x-26,()->{detail=true;clearAndInit();});
-   button(Text.literal("Участники"),right,y+41,rw,()->client.setScreen(new PartyScreen(data,0)));
-   button(Text.literal("Сложность"),right,y+85,rw,()->client.setScreen(new PartyScreen(data,2)));
-   button(Text.literal("Личные настройки"),right,y+122,rw,()->client.setScreen(new PersonalScreen(data)));
+   int rx=x+w*59/100,rw=x+w-rx-17,lw=rx-x-27;
+   button("История",x+17,y+153,lw,()->{detail=true;clearAndInit();});
+   button("Участники",rx,y+49,rw,()->client.setScreen(new PartyScreen(data,0)));
+   button("Сложность",rx,y+92,rw,()->client.setScreen(new PartyScreen(data,2)));
+   button("Личные",rx,y+134,rw,()->client.setScreen(new PersonalScreen(data)));
   }
-  var start=button(tr(started()?"started":"start"),x+w/2-81,y+167,162,()->send(null));start.active=data.card()!=null&&!started()&&PartyScreen.state!=null&&data.token().equals(PartyScreen.token)&&PartyScreen.state.canStart();
+  LobbyUi.Btn start=startButton(started()?"ИСТОРИЯ ЗАПУЩЕНА":"НАЧАТЬ ИСТОРИЮ",x+w/2-88,y+h-34,176,()->send(null));
+  start.active=data.card()!=null&&!started()&&PartyScreen.state!=null&&data.token().equals(PartyScreen.token)&&PartyScreen.state.canStart();
  }
- private java.util.List<net.minecraft.text.OrderedText> lines(){
-  var lines=new java.util.ArrayList<net.minecraft.text.OrderedText>();var v=values();
+ private List<net.minecraft.text.OrderedText> lines(){
+  List<net.minecraft.text.OrderedText> lines=new ArrayList<>();String[] v=values();int max=board().w()-62;
   for(int i=1;i<v.length;i++)if(!v[i].isBlank()){
-   Text line=i==1?Text.literal(v[i]):tr(NAMES[i]).copy().append(" · ").append(v[i]);
-   lines.addAll(textRenderer.wrapLines(line,w()-44-(PhotoTransfer.pictures(data).isEmpty()?0:90)));
+   Text line=i==1?Text.literal(v[i]):Text.literal(LABELS[i]+": "+v[i]);
+   lines.addAll(textRenderer.wrapLines(line,max));
   }
   return lines;
  }
  @Override public void render(DrawContext d,int mx,int my,float dt){
-  int x=left(),y=top(),w=w();
-  d.fill(0,0,width,height,0xb0181512);
-  d.drawTexture(Identifier.of("whiteout","textures/block/rotten_spruce_planks.png"),x,y,0,0,w,196,32,32);
-  d.fill(x+8,y+8,x+w-8,y+158,0xffd8c9a6);
-  d.fill(x+14,y+11,x+17,y+14,0xff76452f);
+  LobbyUi.Box b=board();int x=b.x(),y=b.y(),w=b.w(),h=b.h();
+  LobbyUi.backdrop(d,width,height);LobbyUi.board(d,b);
+  LobbyUi.fit(d,textRenderer,"ДОСЬЕ / WHITEOUT",x+18,y+15,w-70,LobbyUi.LIGHT,false,0);
+  LobbyUi.pin(d,x+16,y+14);LobbyUi.pin(d,x+w-14,y+h-15);
   if(editing){
-   d.drawText(textRenderer,tr("edit"),x+24,y+12,0x392e23,false);
-   for(int i=0;i<5;i++)d.drawText(textRenderer,tr(NAMES[i]),x+14,y+31+i*26,0x392e23,false);
+   LobbyUi.paper(d,x+13,y+32,w-26,h-72);
+   for(int i=0;i<5;i++){
+    LobbyUi.fit(d,textRenderer,LABELS[i],x+24,y+47+i*25,77,LobbyUi.INK_SOFT,false,0);
+    LobbyUi.plate(d,fields[i]);
+   }
+   LobbyUi.caption(d,textRenderer,"РЕДАКТИРОВАНИЕ КАРТОЧКИ",x+24,y+h-50,w-50,LobbyUi.INK_SOFT);
   }else if(detail||data.card()==null){
-   var c=data.card();
-   d.drawText(textRenderer,c==null?tr("board"):Text.literal(textRenderer.trimToWidth(c.title(),w-74)),x+24,y+16,0x382c20,false);
-   PhotoScreen.mainPhoto(d,data,x+w-56,y+95);
-   int row=y+38;
-   if(c==null)d.drawTextWrapped(textRenderer,tr("empty"),x+22,row,w-44,0x504336);
-   else{
-    var lines=lines();page=Math.min(page,Math.max(0,(lines.size()-1)/8));
-    for(int i=page*8;i<Math.min(lines.size(),(page+1)*8);i++){d.drawText(textRenderer,lines.get(i),x+22,row,0x504336,false);row+=12;}
+   LobbyUi.paper(d,x+14,y+34,w-28,h-77);
+   LobbyUi.pin(d,x+22,y+39);
+   if(data.card()==null){
+    LobbyUi.fit(d,textRenderer,"ДЕЛО ЕЩЁ НЕ ОФОРМЛЕНО",x+33,y+48,w-72,LobbyUi.INK,false,0);
+    d.drawTextWrapped(textRenderer,tr("empty"),x+27,y+75,w-60,LobbyUi.INK_SOFT);
+    LobbyUi.caption(d,textRenderer,"НАСТРОЙТЕ КАРТОЧКУ ЧЕРЕЗ ШЕСТЕРЁНКУ",x+27,y+134,w-60,LobbyUi.INK_SOFT);
+   }else{
+    LobbyUi.fit(d,textRenderer,data.card().title(),x+34,y+47,w-73,LobbyUi.INK,false,0);
+    LobbyUi.divider(d,x+28,y+66,w-56);
+    List<net.minecraft.text.OrderedText> txt=lines();page=Math.min(page,Math.max(0,(txt.size()-1)/9));
+    int yy=y+77;for(int i=page*9;i<Math.min(txt.size(),(page+1)*9);i++){d.drawText(textRenderer,txt.get(i),x+28,yy,LobbyUi.INK_SOFT,false);yy+=12;}
    }
-  }
-  if(!editing&&!detail&&data.card()!=null){
-   int right=x+w*56/100;var c=data.card();
-   d.fill(x+12,y+30,right-7,y+148,0xffc4b593);d.fill(right-4,y+30,x+w-10,y+148,0xffcdbd99);
-   d.drawText(textRenderer,textRenderer.trimToWidth(c.title(),w-70),x+18,y+15,0x352c22,false);
+  }else{
+   int rx=x+w*59/100,rw=x+w-rx-17,lw=rx-x-27;
+   LobbyUi.paper(d,x+13,y+36,lw+9,145);
+   LobbyUi.pin(d,x+23,y+40);
+   LobbyUi.fit(d,textRenderer,data.card().title(),x+28,y+49,lw-17,LobbyUi.INK,false,0);
+   LobbyUi.divider(d,x+24,y+65,lw-16);
    if(PhotoTransfer.pictures(data).isEmpty()){
-    int row=y+45;for(var line:textRenderer.wrapLines(Text.literal(c.description()),right-x-40)){if(row>y+106)break;d.drawText(textRenderer,line,x+22,row,0x483827,false);row+=12;}
-   }else PhotoScreen.collage(d,data,(x+right)/2,y+77);
-   var party=PartyScreen.state;if(party!=null){
-    String mode=party.partner()!=null?"Duo · "+((party.mine()?1:0)+(party.other()?1:0))+"/2":party.invited()!=null?"Ожидание ответа":"Solo";
-    d.drawText(textRenderer,mode,right+5,y+65,0x493d2d,false);
-    d.drawText(textRenderer,party.balance()==null?"По миру":party.balance().label(),right+5,y+109,0x493d2d,false);
+    int yy=y+76;
+    for(var line:textRenderer.wrapLines(Text.literal(data.card().description()),lw-26)){
+     if(yy>y+132)break;d.drawText(textRenderer,line,x+25,yy,LobbyUi.INK_SOFT,false);yy+=12;
+    }
+    LobbyUi.caption(d,textRenderer,data.card().author(),x+25,y+138,lw-25,LobbyUi.INK_SOFT);
+   }else{
+    PhotoScreen.collage(d,data,x+24+lw/2,y+116);
    }
+   LobbyUi.sticky(d,rx-5,y+36,rw+13,144,false);
+   LobbyUi.fit(d,textRenderer,"УЧАСТНИКИ",rx+6,y+57,rw-13,LobbyUi.INK,false,0);
+   var party=PartyScreen.state;
+   if(party!=null&&data.token().equals(PartyScreen.token)){
+    String status=party.partner()!=null?"DUO "+((party.mine()?1:0)+(party.other()?1:0))+"/2":party.invited()!=null?"ОЖИДАНИЕ":"SOLO";
+    LobbyUi.fit(d,textRenderer,status,rx+6,y+76,rw-13,LobbyUi.INK_SOFT,false,0);
+    LobbyUi.led(d,rx+rw-12,y+75,party.canStart()?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
+    LobbyUi.fit(d,textRenderer,party.balance()==null?"По миру":party.balance().label(),rx+6,y+119,rw-13,LobbyUi.INK_SOFT,false,0);
+   }else{
+    LobbyUi.fit(d,textRenderer,"Ожидание связи...",rx+6,y+76,rw-13,LobbyUi.INK_SOFT,false,0);
+   }
+   LobbyUi.thread(d,x+25,y+39,rx+rw-1,y+40);
   }
+  LobbyUi.caption(d,textRenderer,"ЛОББИ / ЗАПИСЬ № 013",x+17,y+h-16,w-34,LobbyUi.LIGHT_DIM);
   super.render(d,mx,my,dt);
  }
  @Override public boolean shouldPause(){return false;}

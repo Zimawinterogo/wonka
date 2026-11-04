@@ -20,7 +20,7 @@ final class AuthorScreen extends SharpScreen{
   else if(!m.body().isEmpty()){key.setText(m.key());body.setText(new GsonBuilder().setPrettyPrinting().create().toJson(JsonParser.parseString(m.body())));}
  }
  private void send(String id,String json){ClientPlayNetworking.send(new StoryAuthor.Page(board.token(),id,rev,json,""));}
- private void btn(int x,int y,int w,String name,Runnable action){addDrawableChild(ButtonWidget.builder(Text.literal(name),b->action.run()).dimensions(x,y,w,19).build());}
+ private void btn(int x,int y,int w,String name,Runnable action){addDrawableChild(LobbyUi.button(Text.literal(name),x,y,w,19,action));}
  private void preset(boolean secret,boolean ending){
   try{JsonObject event=body.getText().isBlank()?new JsonObject():JsonParser.parseString(body.getText()).getAsJsonObject();event.addProperty("key",key.getText());event.addProperty("once",true);
    if(!event.has("conditions"))event.add("conditions",new JsonArray());if(!event.has("actions"))event.add("actions",new JsonArray());
@@ -48,6 +48,10 @@ final class AuthorScreen extends SharpScreen{
   btn(x,y+20,63,"Режим",()->cycle("mode","BOTH","SOLO","DUO"));btn(x+65,y+20,60,"Автор",()->cycle("actor","ANY","FIRST","SECOND"));btn(x+127,y+20,81,"Получатель",()->cycle("recipient","ANY","FIRST","SECOND"));btn(x+210,y+20,80,"Видимость",()->cycle("visibility","SHARED","PERSONAL","SECRET"));
   btn(x+w-84,height-20,84,"Сохранить",()->send(key.getText(),body.getText()));send("","");
  }
- @Override public void render(DrawContext d,int mx,int my,float dt){d.fill(0,0,width,height,0xff30271e);d.drawTextWithShadow(textRenderer,"События · задания · сюжетные ветки",10,7,0xffe4d4af);d.drawTextWithShadow(textRenderer,textRenderer.trimToWidth(message,width-120),10,height-19,0xffe4d4af);super.render(d,mx,my,dt);}
+ @Override public void render(DrawContext d,int mx,int my,float dt){LobbyUi.backdrop(d,width,height);LobbyUi.board(d,new LobbyUi.Box(3,3,width-6,height-6));
+  LobbyUi.chalk(d,8,42,width-16,height-108);
+  LobbyUi.fit(d,textRenderer,"СОБЫТИЯ / ЗАДАНИЯ / ВЕТКИ",12,9,width-24,LobbyUi.LIGHT,false,0);
+  LobbyUi.fit(d,textRenderer,message,12,height-17,width-115,LobbyUi.LIGHT,false,0);
+  super.render(d,mx,my,dt);}
  @Override public void close(){client.setScreen(new BoardScreen(board));}
 }
