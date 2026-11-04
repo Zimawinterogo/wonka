@@ -101,7 +101,7 @@ public final class BoardScreen extends SharpScreen {
    d.drawText(textRenderer,textRenderer.trimToWidth(c.title(),w-70),x+18,y+15,0x352c22,false);
    if(PhotoTransfer.pictures(data).isEmpty()){
     int row=y+45;for(var line:textRenderer.wrapLines(Text.literal(c.description()),right-x-40)){if(row>y+106)break;d.drawText(textRenderer,line,x+22,row,0x483827,false);row+=12;}
-   }else PhotoScreen.mainPhoto(d,data,(x+right)/2,y+77);
+   }else PhotoScreen.collage(d,data,(x+right)/2,y+77);
    var party=PartyScreen.state;if(party!=null){
     String mode=party.partner()!=null?"Duo · "+((party.mine()?1:0)+(party.other()?1:0))+"/2":party.invited()!=null?"Ожидание ответа":"Solo";
     d.drawText(textRenderer,mode,right+5,y+65,0x493d2d,false);

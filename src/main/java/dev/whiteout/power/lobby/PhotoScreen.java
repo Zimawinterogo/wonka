@@ -49,11 +49,20 @@ final class PhotoScreen extends SharpScreen{
  static void draw(DrawContext d,Identifier id,int cx,int cy,int w,int h,int angle){
   var m=d.getMatrices();m.push();m.translate(cx,cy,0);m.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(angle));
   d.fill(-w/2-3,-h/2-3,w/2+3,h/2+6,0xffe9dfcc);
-  if(id!=null)d.drawTexture(id,-w/2,-h/2,w,h,0,0,W,H,W,H);else d.fill(-w/2,-h/2,w/2,h/2,0xff776c5b);
+  if(id!=null)d.drawTexture(id,-w/2,-h/2,w,h,0,0,W,H,W,H);else {
+   d.fill(-w/2,-h/2,w/2,h/2,0xff9ca5a3);
+   for(int col=-w/2;col<w/2;col++){double t=(col+w/2.0)/w;int ridge=(int)(h*(.16*Math.cos(8*t)+.08*Math.cos(16*t)));d.fill(col,ridge,col+1,h/2,0xffd8d9cf);}
+  }
   d.fill(-2,-h/2-3,2,-h/2+1,0xff8c4833);m.pop();
  }
  static void mainPhoto(DrawContext d,BoardNetwork.View data,int cx,int cy){
   var photos=pictures(data);if(photos.isEmpty())return;var p=photos.getFirst();draw(d,cache.get(p.hash()),cx+p.x()/3,cy+p.y()/3,70,52,p.angle());
+ }
+ static void collage(DrawContext d,BoardNetwork.View data,int cx,int cy){
+  var photos=pictures(data);if(photos.size()<2){mainPhoto(d,data,cx,cy);return;}
+  var main=photos.getFirst();draw(d,cache.get(main.hash()),cx-19+main.x()/3,cy+main.y()/3,58,44,main.angle());
+  for(int i=1;i<photos.size();i++){var p=photos.get(i);int col=(i-1)%2,row=(i-1)/2;
+   draw(d,cache.get(p.hash()),cx+19+col*22+p.x()/6,cy-16+row*26+p.y()/5,19,15,p.angle());}
  }
  private void select(int i){var pics=pictures(data);index=Math.clamp(i,0,Math.max(0,pics.size()-1));if(!pics.isEmpty()){var p=pics.get(index);x=p.x();y=p.y();angle=p.angle();}}
  private void button(String name,int x,int y,int w,Runnable action){addDrawableChild(ButtonWidget.builder(Text.literal(name),b->action.run()).dimensions(x,y,w,19).build());}

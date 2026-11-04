@@ -43,12 +43,12 @@ public final class MigratedTriggerClient {
   var entry=offered.entrySet().iterator().next();String key=entry.getKey();long deadline=entry.getValue();offered.remove(key);
   if(tick>deadline||!key.startsWith("cutscene_trigger:"))return;
   var trigger=DirectorTriggerManager.get(key.substring("cutscene_trigger:".length()));
-  if(trigger==null||!trigger.enabled)return;
-  var effects=presentation(trigger.effects);
+  if(trigger!=null&&!trigger.enabled)return;
+  List<StoryEffects.Effect> effects=trigger==null?List.of():presentation(trigger.effects);
   if(!StoryEffects.preflight(effects))return;
   StoryAuthorityClient.request(key,()->world==client.world&&managed(key),()->client.currentScreen==null&&!DirectorPlayer.playing(),()->{
    if(!effects.isEmpty()&&!StoryEffects.run(effects))return false;
-   if(!trigger.sceneId.isBlank()&&!StoryEffects.hasBlocking(effects)&&!DirectorPlayer.playing())return DirectorPlayer.play(trigger.sceneId);
+   if(trigger!=null&&!trigger.sceneId.isBlank()&&!StoryEffects.hasBlocking(effects)&&!DirectorPlayer.playing())return DirectorPlayer.play(trigger.sceneId);
    return true;
   },null);
  }
