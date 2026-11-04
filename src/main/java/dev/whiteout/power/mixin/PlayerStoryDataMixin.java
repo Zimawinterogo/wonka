@@ -7,7 +7,10 @@ import org.spongepowered.asm.mixin.*;
 import java.util.*;
 
 @Mixin(value=Store.Data.class,remap=false)
-public abstract class PlayerStoryDataMixin implements ScopedStory.Players,dev.whiteout.power.lobby.LobbyState.Access,dev.whiteout.power.lobby.Balance.Access {
+public abstract class PlayerStoryDataMixin implements ScopedStory.Players,dev.whiteout.power.lobby.LobbyState.Access,dev.whiteout.power.lobby.Balance.Access,dev.whiteout.power.SharedScene.Access {
+ @Unique @SerializedName("runningStoryScene") private dev.whiteout.power.SharedScene.Playing whiteout$playing;
+ public dev.whiteout.power.SharedScene.Playing whiteout$scene(){return whiteout$playing;}
+ public void whiteout$scene(dev.whiteout.power.SharedScene.Playing playing){whiteout$playing=playing;}
  @Unique @SerializedName("lobbyBalance") private dev.whiteout.power.lobby.Balance whiteout$tuning;
  public dev.whiteout.power.lobby.Balance whiteout$balance(){return whiteout$tuning;}
  public void whiteout$balance(dev.whiteout.power.lobby.Balance value){whiteout$tuning=value;}

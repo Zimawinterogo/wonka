@@ -22,7 +22,7 @@ public final class Narrative{
    when=when==null?List.of():List.copyOf(when);if(when.size()>16)throw new IllegalArgumentException("ending requirements");}
  }
  public record Policy(Mode mode,Role actor,Role recipient,Visibility visibility,boolean together,String voteGroup,
-                      List<Requirement> when,String firstDialogue,String secondDialogue,boolean waitForReaders,List<Ending> endings){
+                      List<Requirement> when,String firstDialogue,String secondDialogue,boolean waitForReaders,List<Ending> endings,SharedScene.Spec sharedScene){
   public Policy{
    mode=Objects.requireNonNullElse(mode,Mode.BOTH);actor=Objects.requireNonNullElse(actor,Role.ANY);recipient=Objects.requireNonNullElse(recipient,Role.ANY);
    visibility=Objects.requireNonNullElse(visibility,Visibility.SHARED);
@@ -31,6 +31,7 @@ public final class Narrative{
    if(endings.stream().map(Ending::id).distinct().count()!=endings.size()||endings.stream().map(Ending::priority).distinct().count()!=endings.size())throw new IllegalArgumentException("duplicate ending id or priority");
   }
   void validate(StoryEventCatalog.Event e){
+   if(sharedScene!=null&&(e.scope()!=ScopedStory.Scope.WORLD||!e.once()||visibility!=Visibility.SHARED||!endings.isEmpty()||waitForReaders))throw new IllegalArgumentException("shared scene needs an exclusive WORLD Once entrance");
    if(visibility!=Visibility.SHARED&&(recipient==Role.ANY||e.scope()!=ScopedStory.Scope.PLAYER)||visibility==Visibility.SECRET&&actor!=recipient||
       together&&(e.area()==null||!e.once())||voteGroup!=null&&(actor!=Role.ANY||!e.once()||e.scope()!=ScopedStory.Scope.WORLD)||
       !endings.isEmpty()&&(!e.once()||e.scope()!=ScopedStory.Scope.WORLD||e.checkpoint()!=null)||waitForReaders&&firstDialogue==null&&secondDialogue==null)
@@ -53,7 +54,7 @@ public final class Narrative{
  }
  public static boolean allowed(ServerPlayerEntity p,StoryEventCatalog.Event e){
   var n=e.narrative();var store=Store.get(p.getServer());var d=LobbyState.get(store);
-  if(d!=null&&d.started()&&(store.data.completedEvents.contains(FINISHED)||!Party.active(p)||!DialogueBarrier.admits(p)))return false;
+  if(d!=null&&d.started()&&(store.data.completedEvents.contains(FINISHED)||SharedScene.current(store)!=null||!Party.active(p)||!DialogueBarrier.admits(p)))return false;
   if(n==null)return true;
   if(d==null||!d.started()||!Party.member(d,p.getUuid())||!p.getUuid().equals(id(d,n.actor,p.getUuid()))||owner(p,e)==null||
      n.mode!=Mode.BOTH&&!n.mode.name().equals(d.mode().name())||!matches(store,d,n.when))return false;
@@ -67,6 +68,7 @@ public final class Narrative{
  public static final String FINISHED="whiteout:story_finished";
  static StoryCommitTransaction.Result commit(ServerPlayerEntity p,StoryEventCatalog.Event e,ScopedStory.Position pos)throws Exception{
   var store=Store.get(p.getServer());var n=e.narrative();var d=LobbyState.get(store);
+  if(n!=null&&n.sharedScene()!=null)return SharedScene.begin(p,store,e,pos);
   if(n==null||n.endings.isEmpty())return ScopedStory.apply(store,owner(p,e),e,pos);
   var ending=n.endings.stream().filter(end->matches(store,d,end.when)).max(Comparator.comparingInt(Ending::priority)).orElseThrow(()->new IllegalStateException("no eligible ending"));
   var finalEvent=StoryAuthority.definition(p.getServer(),ending.event);

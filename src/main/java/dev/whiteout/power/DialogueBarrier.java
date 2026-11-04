@@ -51,9 +51,9 @@ public final class DialogueBarrier{
   }
  }
  static void register(){
-  PayloadTypeRegistry.playS2C().register(Cue.ID,Cue.CODEC);PayloadTypeRegistry.playC2S().register(Cue.ID,Cue.CODEC);
+  SharedScene.register();PayloadTypeRegistry.playS2C().register(Cue.ID,Cue.CODEC);PayloadTypeRegistry.playC2S().register(Cue.ID,Cue.CODEC);
   ServerPlayNetworking.registerGlobalReceiver(Cue.ID,(cue,c)->c.server().execute(()->{
-   if(!cue.kind.equals("read"))return;var r=run(c.server());var reader=r.readers.get(c.player().getUuid());
+   if(!cue.kind.equals("read")){SharedScene.response(c.player(),cue);return;}var r=run(c.server());var reader=r.readers.get(c.player().getUuid());
    if(reader!=null&&reader.id.equals(cue.id))r.readers.remove(c.player().getUuid());
   }));
   ServerPlayConnectionEvents.JOIN.register((h,sender,s)->{var d=LobbyState.get(Store.get(s));var reader=run(s).readers.get(h.getPlayer().getUuid());if(reader!=null&&d!=null&&d.revision()==reader.revision)send(h.getPlayer(),new Cue(reader.id,"dialogue",reader.script));});
