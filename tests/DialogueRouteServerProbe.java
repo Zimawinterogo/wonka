@@ -14,6 +14,9 @@ public class DialogueRouteServerProbe {
   var b=new RegistryByteBuf(Unpooled.buffer(),DynamicRegistryManager.EMPTY);
   try{
    var story=new StoryAuthorityNetwork.Request(123,"cutscene_trigger:bridge");StoryAuthorityNetwork.Request.CODEC.encode(b,story);if(!story.equals(StoryAuthorityNetwork.Request.CODEC.decode(b)))throw new AssertionError();
+   var manifest=new TriggerAuthority.Notice(true,"cutscene_trigger:a\ndialogue_choice:a:0:0");
+   TriggerAuthority.Notice.CODEC.encode(b,manifest);
+   if(!manifest.equals(TriggerAuthority.Notice.CODEC.decode(b)))throw new AssertionError("trigger manifest codec");
    for(var outcome:StoryReceipts.Outcome.values()){
     var receipt=new StoryAuthorityNetwork.Reply(123,outcome);StoryAuthorityNetwork.Reply.CODEC.encode(b,receipt);if(!receipt.equals(StoryAuthorityNetwork.Reply.CODEC.decode(b)))throw new AssertionError();
    }

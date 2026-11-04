@@ -2,7 +2,7 @@ package dev.whiteout.power;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.whiteout.Store;
-import dev.whiteout.StoryRules;
+
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
@@ -47,10 +47,8 @@ public final class TriggerAuthority {
   return current;
  }
  private static boolean eligible(ServerPlayerEntity p,Session session,String key){
-  var store=Store.get(p.getServer());var event=session.catalog().find(key);
-  return event!=null&&store.error==null&&!(event.once()&&store.data.completedEvents.contains(key))
-   &&StoryRules.matches(store.data.storyVariables,event.conditions())
-   &&StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(p,store.data))==WinterCrisisConditions.Truth.TRUE;
+  var store=Store.get(p.getServer());
+  return store.error==null&&session.catalog().eligible(key,store.data,new StoryWorldSource(p,store.data));
  }
  private static boolean position(TriggerEvidence.Rule r,ServerPlayerEntity p){
   if(r.binding().zone())return r.area().dimension().equals(body(p).dimension())&&body(p).intersects(r.area())==(r.binding().type()==TriggerEvidence.Kind.ENTER_BOX);
@@ -87,8 +85,9 @@ public final class TriggerAuthority {
    }
   });
   UseEntityCallback.EVENT.register((player,world,hand,entity,hit)->{
-   if(player instanceof ServerPlayerEntity p&&hand==Hand.MAIN_HAND&&entity.isAlive()&&entity.getWorld()==world&&p.canInteractWithEntity(entity,0)&&p.canSee(entity))
-    arm(p,TriggerEvidence.Kind.INTERACT_ENTITY,entity.getUuidAsString());
+   if(player instanceof ServerPlayerEntity p&&hand==Hand.MAIN_HAND&&entity!=player&&entity.isAlive()&&entity.getWorld()==world
+      &&p.canInteractWithEntity(entity,0)&&p.canSee(entity)&&arm(p,TriggerEvidence.Kind.INTERACT_ENTITY,entity.getUuidAsString())>0)
+    return ActionResult.SUCCESS;
    return ActionResult.PASS;
   });
   CommandRegistrationCallback.EVENT.register((dispatcher,registry,environment)->dispatcher.register(literal("whiteout")

@@ -57,6 +57,13 @@ public final class StoryEventCatalog {
  public record Data(int schema,List<Event> events){}
  private final Map<String,String> events=new LinkedHashMap<>();
  private final Map<String,TriggerEvidence.Rule> rules=new LinkedHashMap<>();
+ private final Map<String,Event> boundEvents=new HashMap<>();
+ boolean eligible(String key,dev.whiteout.Store.Data data,StoryWorldConditions.Source world){
+  Event event=boundEvents.get(key);
+  return event!=null&&!(event.once()&&data.completedEvents.contains(key))
+   &&StoryRules.matches(data.storyVariables,event.conditions())
+   &&StoryWorldConditions.evaluate(event.world(),world)==WinterCrisisConditions.Truth.TRUE;
+ }
  public Collection<TriggerEvidence.Rule> rules(){return Collections.unmodifiableCollection(rules.values());}
  public TriggerEvidence.Rule rule(String key){return rules.get(key);}
  private String error="";
@@ -71,13 +78,14 @@ public final class StoryEventCatalog {
     if(events.putIfAbsent(event.key(),JSON.toJson(event))!=null)throw new IllegalArgumentException("duplicate key");
     if(event.trigger()!=null){
      if(data.schema()!=2)throw new IllegalArgumentException("trigger bindings require schema 2");
+     boundEvents.put(event.key(),event);
      rules.put(event.key(),new TriggerEvidence.Rule(event.key(),event.area(),event.trigger()));
     }
    }
    for(var rule:rules.values())for(String next:rule.binding().nextChoices()){
     if(!rules.containsKey(next)||rules.get(next).binding().type()!=TriggerEvidence.Kind.CHOICE)throw new IllegalArgumentException("unknown choice: "+next);
    }
-  }catch(Exception failure){events.clear();rules.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
+  }catch(Exception failure){events.clear();rules.clear();boundEvents.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
  }
  public boolean invalid(){return !error.isEmpty();}
  public String error(){return error;}

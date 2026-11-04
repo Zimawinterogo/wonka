@@ -88,7 +88,10 @@ public final class StoryAuthority {
    Store store=Store.get(player.getServer());
    if(StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,store.data))!=WinterCrisisConditions.Truth.TRUE)return StoryReceipts.Outcome.CONDITIONS_FALSE;
    var result=StoryCommitTransaction.apply(store,event);
-   if(result==StoryCommitTransaction.Result.COMMITTED&&event.trigger()!=null)TriggerAuthority.committed(player,key);
+   if(result==StoryCommitTransaction.Result.COMMITTED&&event.trigger()!=null){
+    try{TriggerAuthority.committed(player,key);}
+    catch(RuntimeException failure){LOG.warn("Committed trigger could not dispatch its continuation",failure);}
+   }
    // A delivery error does not turn a committed transaction into a rejected one.
    try{if(result==StoryCommitTransaction.Result.COMMITTED)WhiteoutNetwork.syncAll(player.getServer());else WhiteoutNetwork.sync(player);}
    catch(RuntimeException failure){LOG.warn("Story state committed/read but snapshot delivery failed",failure);}
