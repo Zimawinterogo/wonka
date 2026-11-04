@@ -1,6 +1,7 @@
 package dev.whiteout.power;
 
 import com.google.gson.*;
+import net.minecraft.server.network.ServerPlayerEntity;
 import dev.whiteout.StoryRules;
 import java.io.IOException;
 import java.nio.file.*;
@@ -62,6 +63,8 @@ public final class StoryEventCatalog {
  public record Data(int schema,List<Event> events){}
  private final Map<String,String> events=new LinkedHashMap<>();
  private final Map<String,TriggerEvidence.Rule> rules=new LinkedHashMap<>();
+ private final Map<String,String> fingerprints=new HashMap<>();
+ String fingerprint(String key){return fingerprints.computeIfAbsent(key,TriggerAuthority::fingerprint);}
  private final Map<String,Event> boundEvents=new HashMap<>();
  boolean eligible(String key,dev.whiteout.Store.Data root,net.minecraft.server.network.ServerPlayerEntity player){
   Event event=boundEvents.get(key);
@@ -75,6 +78,7 @@ public final class StoryEventCatalog {
  }
  public Collection<TriggerEvidence.Rule> rules(){return Collections.unmodifiableCollection(rules.values());}
  public TriggerEvidence.Rule rule(String key){return rules.get(key);}
+ boolean visible(ServerPlayerEntity player,String key){var e=boundEvents.get(key);return e!=null&&(e.narrative()==null||Narrative.allowed(player,e));}
  private String error="";
  public StoryEventCatalog(Path path){
   if(!Files.exists(path))return;

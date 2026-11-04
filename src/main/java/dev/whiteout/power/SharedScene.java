@@ -11,8 +11,8 @@ import java.util.*;
 
 public final class SharedScene{
  private SharedScene(){}
- public record Spec(String scene,int ticks,String completion){
-  public Spec{if(scene==null||!scene.matches("[a-zA-Z0-9_-]{1,80}")||ticks<1||ticks>72000||completion==null||!completion.matches("[a-zA-Z0-9_.:/-]{1,128}"))throw new IllegalArgumentException("shared scene specification");}
+ public record Spec(String scene,int ticks,String completion,List<SceneDelivery.Action> deliveries){
+  public Spec{deliveries=deliveries==null?List.of():List.copyOf(deliveries);if(deliveries.size()>8||scene==null||!scene.matches("[a-zA-Z0-9_-]{1,80}")||ticks<1||ticks>72000||completion==null||!completion.matches("[a-zA-Z0-9_.:/-]{1,128}"))throw new IllegalArgumentException("shared scene specification");}
  }
  public record Playing(UUID id,Spec spec,int elapsed){
   public Playing{Objects.requireNonNull(id);Objects.requireNonNull(spec);if(elapsed<0||elapsed>spec.ticks)throw new IllegalArgumentException("scene cursor");}
@@ -54,14 +54,15 @@ public final class SharedScene{
     boolean eligible=players.stream().anyMatch(p->exit.area().contains(p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ())&&StoryWorldConditions.evaluate(exit.world(),new StoryWorldSource(p,store.data))==WinterCrisisConditions.Truth.TRUE);
     if(!eligible)return;
     for(var scene:exit.scenes())if(!CrisisRuntime.requestable(s,scene))return;
+    var grants=(SceneDelivery.Access)(Object)store.data;var old=grants.whiteout$grants();grants.whiteout$grants(SceneDelivery.prepare(s,store,exit.key(),r.spec.deliveries));
     access.whiteout$scene(null);boolean committed=false;
-    try{committed=StoryCommitTransaction.apply(store,exit)==StoryCommitTransaction.Result.COMMITTED;}finally{if(!committed)access.whiteout$scene(r);}
+    try{committed=StoryCommitTransaction.apply(store,exit)==StoryCommitTransaction.Result.COMMITTED;}finally{if(!committed){access.whiteout$scene(r);grants.whiteout$grants(old);}}
     if(committed){for(var p:players)send(p,r,"finish","");runtime.remove(s);WhiteoutNetwork.syncAll(s);}
    }else if(st.elapsed%100==0){
     access.whiteout$scene(new Playing(r.id,r.spec,st.elapsed));try{store.save();}catch(Exception failure){access.whiteout$scene(r);throw failure;}
    }
   }catch(Exception ex){if(s.getTicks()%200==0)org.slf4j.LoggerFactory.getLogger("whiteout-story").warn("Shared scene waiting for completion",ex);}
  }
- static void register(){ServerTickEvents.END_SERVER_TICK.register(SharedScene::tick);ServerLifecycleEvents.SERVER_STOPPED.register(runtime::remove);
+ static void register(){SceneDelivery.register();ServerTickEvents.END_SERVER_TICK.register(SharedScene::tick);ServerLifecycleEvents.SERVER_STOPPED.register(runtime::remove);
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{var st=runtime.get(s);if(st!=null){UUID id=h.getPlayer().getUuid();st.sent.remove(id);st.loaded.remove(id);st.votes.clear();}});}
 }

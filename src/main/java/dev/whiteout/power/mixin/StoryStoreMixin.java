@@ -24,6 +24,7 @@ public abstract class StoryStoreMixin {
   ((ScopedStory.Players)(Object)ci.getReturnValue()).whiteout$players().clear();
   ((dev.whiteout.power.lobby.LobbyState.Access)(Object)ci.getReturnValue()).whiteout$lobby(null);
   ((dev.whiteout.power.SharedScene.Access)(Object)ci.getReturnValue()).whiteout$scene(null);
+  ((dev.whiteout.power.SceneDelivery.Access)(Object)ci.getReturnValue()).whiteout$grants().clear();
  }
  @Inject(method="<init>(Ljava/nio/file/Path;)V",at=@At("RETURN"))
  private void whiteout$incompleteSave(Path path,CallbackInfo ci){

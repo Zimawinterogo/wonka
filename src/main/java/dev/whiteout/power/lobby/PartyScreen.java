@@ -15,9 +15,10 @@ final class PartyScreen extends SharpScreen{
  static void register(){ClientPlayNetworking.registerGlobalReceiver(Party.Info.ID,(m,c)->c.client().execute(()->{
   token=m.token();state=BoardNetwork.JSON.fromJson(m.json(),Party.Status.class);
   if(c.client().currentScreen instanceof PartyScreen scr&&scr.view.token().equals(token)&&scr.tab==0)scr.clearAndInit();
+  if(c.client().currentScreen instanceof BoardScreen scr)scr.changed(token);
  }));}
  private static final String[] labels={"Ген. новый %","Ген. старый %","Лампа мин","Заряд мин","Фонарь мин","Отказ %","Проверка сек","Метель сек","Снег сек"};
- private void request(String action,String value){ClientPlayNetworking.send(new Party.Request(view.token(),view.revision(),action,value));}
+ private void request(String action,String value){ClientPlayNetworking.send(new Party.Request(view.token(),state.revision(),action,value));}
  private void btn(int x,int y,int w,String t,Runnable r){addDrawableChild(ButtonWidget.builder(Text.literal(t),b->r.run()).dimensions(x,y,w,19).build());}
  private String name(UUID id){return state.online().stream().filter(p->p.id().equals(id)).map(Party.Person::name).findFirst().orElse("офлайн");}
  @Override protected void init(){

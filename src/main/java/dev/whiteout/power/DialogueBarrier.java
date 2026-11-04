@@ -25,9 +25,10 @@ public final class DialogueBarrier{
  }
  private static final Map<MinecraftServer,Run> runs=new WeakHashMap<>();
  private static Run run(MinecraftServer s){return runs.computeIfAbsent(s,k->new Run());}
- static boolean admits(ServerPlayerEntity p){
+ static boolean admits(ServerPlayerEntity p,String key){
   var run=runs.get(p.getServer());if(run==null)return true;
   var d=LobbyState.get(Store.get(p.getServer()));if(d==null)return true;
+  var mine=run.readers.get(p.getUuid());if(mine!=null&&mine.revision==d.revision()&&key.startsWith("dialogue_choice:"+mine.script+":"))return true;
   return run.readers.entrySet().stream().noneMatch(entry->entry.getValue().revision==d.revision()&&entry.getValue().waitForReaders&&p.getServer().getPlayerManager().getPlayer(entry.getKey())!=null);
  }
  static boolean vote(ServerPlayerEntity p,StoryEventCatalog.Event e){
@@ -47,6 +48,7 @@ public final class DialogueBarrier{
    if(n.visibility()!=Narrative.Visibility.SHARED&&!who.equals(Narrative.owner(actor,e)))continue;
    if(peer!=null&&peer!=actor&&(n.together()||n.visibility()!=Narrative.Visibility.SHARED)&&e.trigger()!=null){TriggerAuthority.companion(peer,e.key());send(peer,new Cue(UUID.randomUUID(),"trigger",e.key()));}
    String script=who.equals(d.first())?n.firstDialogue():n.secondDialogue();if(script==null||peer==null)continue;
+   if(peer!=actor&&e.trigger()!=null)TriggerAuthority.companion(peer,e.key());
    var reader=new Reading(UUID.randomUUID(),script,n.waitForReaders(),d.revision());r.readers.put(who,reader);send(peer,new Cue(reader.id,"dialogue",script));
   }
  }

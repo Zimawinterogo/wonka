@@ -17,9 +17,9 @@ public final class Narrative{
   public Requirement{Objects.requireNonNull(source);conditions=conditions==null?List.of():List.copyOf(conditions);completed=completed==null?List.of():List.copyOf(completed);
    StoryRules.validate(conditions,List.of());if(completed.size()>16||completed.stream().anyMatch(k->!key(k)))throw new IllegalArgumentException("requirements");}
  }
- public record Ending(String id,String title,int priority,List<Requirement> when,String event){
+ public record Ending(String id,String title,int priority,List<Requirement> when,String event,List<SceneDelivery.Action> deliveries){
   public Ending{if(id==null||!id.matches("[a-z0-9_]{1,32}")||title==null||title.isBlank()||title.length()>100||!key(event))throw new IllegalArgumentException("ending");
-   when=when==null?List.of():List.copyOf(when);if(when.size()>16)throw new IllegalArgumentException("ending requirements");}
+   when=when==null?List.of():List.copyOf(when);deliveries=deliveries==null?List.of():List.copyOf(deliveries);if(when.size()>16||deliveries.size()>8)throw new IllegalArgumentException("ending requirements");}
  }
  public record Policy(Mode mode,Role actor,Role recipient,Visibility visibility,boolean together,String voteGroup,
                       List<Requirement> when,String firstDialogue,String secondDialogue,boolean waitForReaders,List<Ending> endings,SharedScene.Spec sharedScene){
@@ -54,7 +54,7 @@ public final class Narrative{
  }
  public static boolean allowed(ServerPlayerEntity p,StoryEventCatalog.Event e){
   var n=e.narrative();var store=Store.get(p.getServer());var d=LobbyState.get(store);
-  if(d!=null&&d.started()&&(store.data.completedEvents.contains(FINISHED)||SharedScene.current(store)!=null||!Party.active(p)||!DialogueBarrier.admits(p)))return false;
+  if(d!=null&&d.started()&&(store.data.completedEvents.contains(FINISHED)||SharedScene.current(store)!=null||!Party.active(p)||!DialogueBarrier.admits(p,e.key())))return false;
   if(n==null)return true;
   if(d==null||!d.started()||!Party.member(d,p.getUuid())||!p.getUuid().equals(id(d,n.actor,p.getUuid()))||owner(p,e)==null||
      n.mode!=Mode.BOTH&&!n.mode.name().equals(d.mode().name())||!matches(store,d,n.when))return false;
@@ -75,10 +75,11 @@ public final class Narrative{
   if(!finalEvent.serverOnly()||!finalEvent.once()||finalEvent.scope()!=ScopedStory.Scope.WORLD||finalEvent.narrative()!=null||finalEvent.world()!=null||
     !finalEvent.area().contains(pos.dimension(),pos.x(),pos.y(),pos.z()))throw new IllegalStateException("invalid ending definition");
   for(var scene:finalEvent.scenes())if(!CrisisRuntime.requestable(p.getServer(),scene))throw new IllegalStateException("ending scene missing");
-  return StoryCommitTransaction.apply(store,e,state->{
+  var access=(SceneDelivery.Access)(Object)store.data;var old=access.whiteout$grants();access.whiteout$grants(SceneDelivery.prepare(p.getServer(),store,e.key(),ending.deliveries()));
+  boolean saved=false;try{var outcome=StoryCommitTransaction.apply(store,e,state->{
    if(!state.completed.add(FINISHED)||!state.completed.add(finalEvent.key())||!StoryRules.matches(state.variables,finalEvent.conditions()))throw new IllegalStateException("ending unavailable");
    state.variables=StoryRules.apply(state.variables,finalEvent.actions());state.apply(finalEvent.objectives());StorySceneActions.apply(state,finalEvent.scenes());
    state.completed.add("whiteout:ending/"+ending.id);
-  });
+  });saved=outcome==StoryCommitTransaction.Result.COMMITTED;return outcome;}finally{if(!saved)access.whiteout$grants(old);}
  }
 }

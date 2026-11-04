@@ -14,19 +14,23 @@ public final class MigratedTriggerClient {
  private static final Map<String,Long> offered=new LinkedHashMap<>();
  private static Object world;
  private static long tick;
- public static boolean managed(String key){return managed.contains(key);}
+ private static Set<String> hidden=Set.of();
+ public static boolean managed(String key){return !managed.isEmpty()&&managed.contains(TriggerAuthority.fingerprint(key));}
+ public static boolean hidden(String key){return !hidden.isEmpty()&&hidden.contains(TriggerAuthority.fingerprint(key));}
  public static List<StoryEffects.Effect> presentation(List<StoryEffects.Effect> effects){
   return effects.stream().filter(e->switch(e.type){
    case DIALOGUE,RADIO,SOUND,SCENE->true;
    default->false;
   }).toList();
  }
- private static void clear(){managed=Set.of();offered.clear();world=null;}
+ private static void clear(){managed=Set.of();hidden=Set.of();offered.clear();world=null;}
  public static void register(){
   ClientPlayNetworking.registerGlobalReceiver(TriggerAuthority.Notice.ID,(notice,context)->context.client().execute(()->{
    if(notice.manifest()){
-    clear();world=context.client().world;
-    if(!notice.data().isEmpty())managed=Set.copyOf(Arrays.asList(notice.data().split("\\n")));
+    if(world!=context.client().world)clear();world=context.client().world;
+    var keys=new HashSet<String>();var denied=new HashSet<String>();
+    for(String entry:notice.data().split("\n"))if(entry.length()==65){keys.add(entry.substring(1));if(entry.charAt(0)=='-')denied.add(entry.substring(1));}
+    managed=keys;hidden=denied;
    }else if(managed(notice.data()))offered.put(notice.data(),tick+180);
   }));
   ClientPlayConnectionEvents.DISCONNECT.register((h,c)->clear());

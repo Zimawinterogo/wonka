@@ -12,6 +12,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /** Preserve the existing reply/effect presentation after the server accepts the selected choice. */
 @Mixin(value=DialogueScreen.class,remap=false)
 public abstract class DialogueChoiceAuthorityMixin {
+ @Inject(method="choiceAvailable",at=@At("HEAD"),cancellable=true,remap=false)
+ private void whiteout$visible(int index,DialogueManager.Choice choice,org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> ci){
+  if(dev.whiteout.power.MigratedTriggerClient.hidden(choiceKey(index)))ci.setReturnValue(false);
+ }
  @Unique private int whiteout$choiceIndex;
  @ModifyArg(method={"tick","method_25393"},at=@At(value="INVOKE",target="Ljava/lang/Math;min(II)I",ordinal=0),index=1,remap=false)
  private int whiteout$readingSpeed(int ticks){return ticks*dev.whiteout.power.lobby.PersonalScreen.prefs().letters();}

@@ -28,6 +28,12 @@ public final class TriggerAuthority {
  }
  private record Session(StoryEventCatalog catalog,Object world,long epoch,TriggerEvidence evidence){}
  private static final Map<ServerPlayerEntity,Session> sessions=new WeakHashMap<>();
+ private static final Map<ServerPlayerEntity,String> manifests=new WeakHashMap<>();
+ public static String fingerprint(String key){return dev.whiteout.power.lobby.PhotoTransfer.hash(key.getBytes(java.nio.charset.StandardCharsets.UTF_8));}
+ private static void manifest(ServerPlayerEntity p,Session session,boolean force){
+  var list=new StringJoiner("\n");for(var rule:session.catalog.rules())list.add((session.catalog.visible(p,rule.key())?"+":"-")+session.catalog.fingerprint(rule.key()));
+  String value=list.toString();if(force||!value.equals(manifests.get(p))){manifests.put(p,value);ServerPlayNetworking.send(p,new Notice(true,value));}
+ }
  private static boolean live(ServerPlayerEntity p){return p.isAlive()&&!p.isSpectator();}
  private static long now(ServerPlayerEntity p){return p.getServerWorld().getTime();}
  private static TriggerEvidence.Body body(ServerPlayerEntity p){
@@ -41,8 +47,7 @@ public final class TriggerAuthority {
   long epoch=ScopedStory.epoch(Store.get(p.getServer()).data,p.getUuid());
   if(current==null||current.catalog()!=catalog||current.world()!=p.getServerWorld()||current.epoch()!=epoch){
    current=new Session(catalog,p.getServerWorld(),epoch,new TriggerEvidence());sessions.put(p,current);
-   String keys=String.join("\n",catalog.rules().stream().map(TriggerEvidence.Rule::key).toList());
-   ServerPlayNetworking.send(p,new Notice(true,keys));
+   manifest(p,current,true);
   }
   return current;
  }
@@ -82,6 +87,7 @@ public final class TriggerAuthority {
   ServerTickEvents.END_SERVER_TICK.register(server->{
    for(var player:server.getPlayerManager().getPlayerList()){
     Session s=session(player);if(s==null||s.catalog().rules().isEmpty())continue;
+    if(server.getTicks()%20==0)manifest(player,s,false);
     var bounds=body(player);
     for(var rule:s.catalog().rules())s.evidence().observe(rule,bounds,now(player),k->eligible(player,s,k),
      k->ServerPlayNetworking.send(player,new Notice(false,k)));
