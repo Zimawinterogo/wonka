@@ -5,6 +5,7 @@ import java.util.*;
 public class DialogueRouteClientProbe {
  @SuppressWarnings("unchecked")
  public static void main(String[] args)throws Exception{
+  net.minecraft.SharedConstants.createGameVersion();net.minecraft.Bootstrap.initialize();
   if(Arrays.stream(DialogueManager.class.getDeclaredMethods()).noneMatch(m->m.getName().contains("routeDirector")))throw new AssertionError("Director Mixin not applied");
   if(DialogueManager.open("__missing_legacy__")||DialogueManager.openDirector("__missing_legacy__",140))throw new AssertionError("legacy lookup changed");
   if(DialogueRouteClient.intercept("ordinary",140))throw new AssertionError("no-route behavior changed");
