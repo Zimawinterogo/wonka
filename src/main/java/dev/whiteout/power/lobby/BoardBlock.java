@@ -41,6 +41,14 @@ public final class BoardBlock extends Block {
  @Override protected BlockState getStateForNeighborUpdate(BlockState s,Direction dir,BlockState neighbor,WorldAccess world,BlockPos pos,BlockPos other){
   world.scheduleBlockTick(pos,this,1);return s;
  }
+ @Override protected void neighborUpdate(BlockState state,World world,BlockPos pos,Block source,BlockPos from,boolean notify){
+  super.neighborUpdate(state,world,pos,source,from,notify);if(!world.isClient)world.scheduleBlockTick(pos,this,1);
+ }
+ @Override protected void onStateReplaced(BlockState state,World world,BlockPos pos,BlockState next,boolean moved){
+  super.onStateReplaced(state,world,pos,next,moved);
+  if(world.isClient||next.isOf(this))return;var anchor=root(pos,state);
+  for(int i=0;i<4;i++){var part=cell(anchor,state.get(FACE),i);if(!part.equals(pos)&&world.getBlockState(part).isOf(this))world.scheduleBlockTick(part,this,1);}
+ }
  @Override protected void onBlockAdded(BlockState s,World world,BlockPos pos,BlockState old,boolean notify){
   super.onBlockAdded(s,world,pos,old,notify);world.scheduleBlockTick(pos,this,1);
  }

@@ -57,9 +57,16 @@ def boot(first):
             wait(marker, 15)
         if not first:
             command("setblock 4 100 4 minecraft:air")
-            time.sleep(1)
-            command("execute if block 3 101 3 minecraft:air run say BOARD_REMOVED")
-            wait("BOARD_REMOVED", 15)
+            wait("Changed the block", 15)
+            for attempt in range(25):
+                command("execute if block 3 101 3 minecraft:air run say BOARD_REMOVED")
+                try:
+                    wait("BOARD_REMOVED", 1)
+                    break
+                except (queue.Empty, TimeoutError):
+                    if attempt == 24:
+                        raise AssertionError("Board survived removal of its support")
+
         command("stop")
         if process.wait(timeout=60):
             raise RuntimeError("Unclean dedicated shutdown")
