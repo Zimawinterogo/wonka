@@ -5,7 +5,7 @@ import java.util.function.Supplier;
 
 /** Connection-local bounded replay protection; contains no world progress or entity references. */
 public final class StoryReceipts {
- public enum Outcome { COMMITTED, ALREADY_COMPLETED, CONDITIONS_FALSE, DENIED }
+ public enum Outcome { COMMITTED, ALREADY_COMPLETED, CONDITIONS_FALSE, DENIED, WAITING }
  public record Request(long token,String key){}
  public record Reply(long token,Outcome outcome){}
  private record Cached(String key,Outcome outcome){}

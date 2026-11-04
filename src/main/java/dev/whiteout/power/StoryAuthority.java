@@ -25,7 +25,7 @@ public final class StoryAuthority {
  public static void register(){
   if(registered)return;registered=true;
   StoryAuthorityNetwork.register();
-  TriggerAuthority.register();
+  TriggerAuthority.register();DialogueBarrier.register();
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{BUDGETS.remove(h.getPlayer());WARNINGS.remove(h.getPlayer());});
   ServerLifecycleEvents.SERVER_STOPPED.register(s->{CATALOGS.remove(s);BUDGETS.clear();WARNINGS.clear();});
   CommandRegistrationCallback.EVENT.register((dispatcher,registry,environment)->dispatcher.register(literal("whiteout")
@@ -97,10 +97,13 @@ public final class StoryAuthority {
     if(!TriggerAuthority.permits(player,key))return StoryReceipts.Outcome.DENIED;
    }else if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
-   var scoped=ScopedStory.read(store.data,event.scope(),player.getUuid());
+   if(!Narrative.allowed(player,event))return StoryReceipts.Outcome.DENIED;
+   var scoped=ScopedStory.read(store.data,event.scope(),Narrative.owner(player,event));
    if(StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,scoped))!=WinterCrisisConditions.Truth.TRUE)return StoryReceipts.Outcome.CONDITIONS_FALSE;
    var point=new ScopedStory.Position(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ(),player.getYaw(),player.getPitch());
-   var result=ScopedStory.apply(store,player.getUuid(),event,point);
+   if(!DialogueBarrier.vote(player,event))return StoryReceipts.Outcome.WAITING;
+   var result=Narrative.commit(player,event,point);
+   if(result==StoryCommitTransaction.Result.COMMITTED)try{DialogueBarrier.committed(player,event);}catch(RuntimeException delivery){LOG.warn("Committed narrative delivery failed",delivery);}
    if(result==StoryCommitTransaction.Result.COMMITTED&&event.trigger()!=null){
     try{TriggerAuthority.committed(player,key);}
     catch(RuntimeException failure){LOG.warn("Committed trigger could not dispatch its continuation",failure);}
@@ -108,6 +111,7 @@ public final class StoryAuthority {
    // A delivery error does not turn a committed transaction into a rejected one.
    try{if(result==StoryCommitTransaction.Result.COMMITTED)WhiteoutNetwork.syncAll(player.getServer());else WhiteoutNetwork.sync(player);}
    catch(RuntimeException failure){LOG.warn("Story state committed/read but snapshot delivery failed",failure);}
+   if(result==StoryCommitTransaction.Result.COMMITTED&&event.narrative()!=null&&event.narrative().visibility()!=Narrative.Visibility.SHARED&&!player.getUuid().equals(Narrative.owner(player,event)))return StoryReceipts.Outcome.ALREADY_COMPLETED;
    return StoryReceipts.Outcome.valueOf(result.name());
   }catch(Exception failure){denied(player,failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage());return StoryReceipts.Outcome.DENIED;}
  }

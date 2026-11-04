@@ -13,17 +13,24 @@ public final class StoryAuthorityClient {
  private static long tick;
  private static Object world;
  private static BooleanSupplier valid,ready,present;
+ private static String key,deferredKey;private static Runnable deferred;
  private static Consumer<Boolean> finished;
  private StoryAuthorityClient(){}
  public static void register(){
   ClientPlayNetworking.registerGlobalReceiver(StoryAuthorityNetwork.Reply.ID,(p,c)->c.client().execute(()->SESSION.accept(new StoryReceipts.Reply(p.token(),p.outcome()),tick)));
-  ClientPlayConnectionEvents.DISCONNECT.register((h,c)->reset());
+  ClientPlayConnectionEvents.DISCONNECT.register((h,c)->{reset();deferred=null;deferredKey=null;});
+  DuoPresentation.register();
   ClientTickEvents.END_CLIENT_TICK.register(c->{
    tick++;
    if(c.world==null||c.player==null||c.world!=world){reset();return;}
    if(!SESSION.busy())return;
    var retry=SESSION.retry(tick);if(retry!=null)send(retry);
    var outcome=SESSION.outcome();if(outcome==null)return;
+   if(outcome==StoryReceipts.Outcome.WAITING){
+    var check=valid;var action=present;var expected=world;var cb=finished;deferredKey=key;
+    deferred=()->{if(c.world==expected&&check.getAsBoolean()){boolean ok=action.getAsBoolean();if(cb!=null)cb.accept(ok);}};
+    reset();Bridge.message("Выбор сохранён. Ожидание решения напарника.");return;
+   }
    if(outcome!=StoryReceipts.Outcome.COMMITTED){finish(false);return;}
    if(!valid.getAsBoolean()||SESSION.presentationExpired(tick)){finish(false);return;}
    if(!ready.getAsBoolean())return;
@@ -33,6 +40,7 @@ public final class StoryAuthorityClient {
    if(callback!=null)callback.accept(success);
   });
  }
+ static void agreed(String k){if(k.equals(deferredKey)&&deferred!=null){var run=deferred;deferred=null;deferredKey=null;run.run();}}
  private static void send(StoryReceipts.Request request){
   try{ClientPlayNetworking.send(new StoryAuthorityNetwork.Request(request.token(),request.key()));}
   catch(RuntimeException failure){finish(false);}
@@ -45,6 +53,7 @@ public final class StoryAuthorityClient {
   if(mc==null||mc.player==null||mc.world==null||SESSION.busy()||!ClientPlayNetworking.canSend(StoryAuthorityNetwork.Request.ID))return false;
   StoryReceipts.Request request;
   try{request=SESSION.begin(key,tick);}catch(IllegalArgumentException invalid){return false;}
+  deferred=null;deferredKey=null;StoryAuthorityClient.key=key;
   world=mc.world;valid=stillValid;ready=canPresent;present=action;finished=callback;
   send(request);return true;
  }

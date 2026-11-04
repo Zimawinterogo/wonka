@@ -34,7 +34,8 @@ public final class StoryEventCatalog {
    return this.dimension.equals(dimension)&&Double.isFinite(dx)&&Double.isFinite(dy)&&Double.isFinite(dz)&&dx*dx+dy*dy+dz*dz<=radius*radius;
   }
  }
- public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger,ScopedStory.Scope scope,String checkpoint){
+ public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger,ScopedStory.Scope scope,String checkpoint,Narrative.Policy narrative){
+  public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger,ScopedStory.Scope scope,String checkpoint){this(key,once,area,conditions,actions,objectives,world,serverOnly,scenes,trigger,scope,checkpoint,null);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger){this(key,once,area,conditions,actions,objectives,world,serverOnly,scenes,trigger,ScopedStory.Scope.WORLD,null);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes){this(key,once,area,conditions,actions,objectives,world,serverOnly,scenes,null);}
   public Event { scope=Objects.requireNonNullElse(scope,ScopedStory.Scope.WORLD);objectives=objectives==null?List.of():List.copyOf(objectives);scenes=scenes==null?List.of():List.copyOf(scenes); }
@@ -44,6 +45,7 @@ public final class StoryEventCatalog {
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world){this(key,once,area,conditions,actions,objectives,world,false);}
   public void validate(){
    if(key==null||!key.matches("[a-zA-Z0-9_.:/-]{1,128}")||(area==null&&trigger==null)||conditions==null||actions==null)throw new IllegalArgumentException("event");
+   if(narrative!=null)narrative.validate(this);
    if(scope==ScopedStory.Scope.PLAYER&&(serverOnly||!scenes.isEmpty()))throw new IllegalArgumentException("Director events require WORLD scope");
    if(checkpoint!=null){StoryRules.name(checkpoint);if(serverOnly)throw new IllegalArgumentException("checkpoint requires a player position");}
    if(trigger!=null){
@@ -64,7 +66,8 @@ public final class StoryEventCatalog {
  boolean eligible(String key,dev.whiteout.Store.Data root,net.minecraft.server.network.ServerPlayerEntity player){
   Event event=boundEvents.get(key);
   if(event==null)return false;
-  var data=ScopedStory.read(root,event.scope(),player.getUuid());
+  if(!Narrative.allowed(player,event))return false;
+  var data=ScopedStory.read(root,event.scope(),Narrative.owner(player,event));
   var world=new StoryWorldSource(player,data);
   return event!=null&&!(event.once()&&data.completedEvents.contains(key))
    &&StoryRules.matches(data.storyVariables,event.conditions())
@@ -80,13 +83,14 @@ public final class StoryEventCatalog {
    var root=JsonParser.parseString(Files.readString(path)).getAsJsonObject();
    for(var entry:root.getAsJsonArray("events")){
     var object=entry.getAsJsonObject();
+    if(object.has("narrative")&&root.get("schema").getAsInt()!=4)throw new IllegalArgumentException("narrative requires schema 4");
     if(object.has("scope")||object.has("checkpoint")){
-     if(root.get("schema").getAsInt()!=3&&(object.has("checkpoint")||!"WORLD".equals(object.get("scope").getAsString())))throw new IllegalArgumentException("scoped progress requires schema 3");
+     if(root.get("schema").getAsInt()<3&&(object.has("checkpoint")||!"WORLD".equals(object.get("scope").getAsString())))throw new IllegalArgumentException("scoped progress requires schema 3");
      if(object.has("scope"))ScopedStory.Scope.valueOf(object.get("scope").getAsString());
     }
    }
    Data data=JSON.fromJson(root,Data.class);
-   if(data==null||(data.schema()!=1&&data.schema()!=2&&data.schema()!=3)||data.events()==null||data.events().size()>MAX_EVENTS)throw new IllegalArgumentException("schema/events");
+   if(data==null||(data.schema()!=1&&data.schema()!=2&&data.schema()!=3&&data.schema()!=4)||data.events()==null||data.events().size()>MAX_EVENTS)throw new IllegalArgumentException("schema/events");
    for(Event event:data.events()){
     if(event==null)throw new IllegalArgumentException("null event");event.validate();
     if(events.putIfAbsent(event.key(),JSON.toJson(event))!=null)throw new IllegalArgumentException("duplicate key");

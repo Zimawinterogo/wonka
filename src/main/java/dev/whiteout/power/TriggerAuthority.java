@@ -58,6 +58,9 @@ public final class TriggerAuthority {
   Session s=session(p);if(s==null)return false;var r=s.catalog().rule(key);
   return r!=null&&position(r,p)&&s.evidence().permits(r,now(p));
  }
+ static void companion(ServerPlayerEntity p,String key){
+  var s=session(p);if(s!=null){var r=s.catalog.rule(key);if(r!=null)s.evidence.consume(r,now(p));}
+ }
  static void committed(ServerPlayerEntity p,String key){
   var s=sessions.get(p);var rule=s.catalog().rule(key);s.evidence().consume(rule,now(p));
   if(rule.binding().emit()!=null)signal(p,rule.binding().emit());
