@@ -1,0 +1,66 @@
+{
+  "dialogues": {
+    "final_first": {
+      "aliases": [],
+      "npc_uuids": [],
+      "lines": [
+        {
+          "speaker": "Тест",
+          "text": "Вы видите финальную сцену. Решение принимает второй персонаж.",
+          "choices": []
+        },
+        {
+          "speaker": "Тест",
+          "text": "Конец тестового диалога."
+        }
+      ]
+    },
+    "letter": {
+      "aliases": [],
+      "npc_uuids": [],
+      "lines": [
+        {
+          "speaker": "Тест",
+          "text": "Засчитать найденное письмо?",
+          "choices": [
+            {
+              "text": "Прочитать",
+              "once": true,
+              "next": 1
+            }
+          ]
+        },
+        {
+          "speaker": "Тест",
+          "text": "Конец тестового диалога."
+        }
+      ]
+    },
+    "final_second": {
+      "aliases": [],
+      "npc_uuids": [],
+      "lines": [
+        {
+          "speaker": "Тест",
+          "text": "Выберите тестовую ветку.",
+          "choices": [
+            {
+              "text": "Выстрелить",
+              "once": true,
+              "next": 1
+            },
+            {
+              "text": "Пощадить",
+              "once": true,
+              "next": 1
+            }
+          ]
+        },
+        {
+          "speaker": "Тест",
+          "text": "Конец тестового диалога."
+        }
+      ]
+    }
+  }
+}

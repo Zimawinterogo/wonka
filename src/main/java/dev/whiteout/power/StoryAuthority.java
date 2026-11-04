@@ -88,6 +88,7 @@ public final class StoryAuthority {
  public static StoryReceipts.Outcome execute(ServerPlayerEntity player,String key){
   if(!player.getServer().isOnThread())throw new IllegalStateException("Story requests require server thread");
   try{
+   if(DuoTestMode.switching(player))return StoryReceipts.Outcome.DENIED;
    var test=DuoTestMode.active(player);if(test!=null)return test.act(player,player.getUuid(),key);
    if(!player.isAlive()||player.isSpectator())throw new IllegalArgumentException("player state");
    StoryEventCatalog definitions=catalog(player.getServer());

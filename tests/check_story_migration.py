@@ -60,11 +60,15 @@ with tempfile.TemporaryDirectory() as folder:
     assert subprocess.run(command, capture_output=True).returncode == 0
     original = output.read_bytes()
     assert json.loads(original) == result
+    audit = subprocess.run(command[:5] + ['--audit'], capture_output=True)
+    assert audit.returncode == 0 and json.loads(audit.stdout)['bindings'][0]['key'] == 'cutscene_trigger:lake_gate'
     assert subprocess.run(command, capture_output=True).returncode == 2
     assert output.read_bytes() == original
     output.unlink()
     source.write_text(json.dumps(dict(triggers=[trigger, dict(trigger, id='bad', type='SIGNAL')])), encoding='utf-8')
     assert subprocess.run(command, capture_output=True).returncode == 2 and not output.exists()
+    audit = subprocess.run(command[:5] + ['--audit'], capture_output=True)
+    assert audit.returncode == 2 and json.loads(audit.stdout)['rejected'][0]['index'] == 1
     scene['events'].append(dict(type='COMMAND', value='anything'))
     (root / 'wdlg_lake.json').write_text(json.dumps(scene), encoding='utf-8')
     try:

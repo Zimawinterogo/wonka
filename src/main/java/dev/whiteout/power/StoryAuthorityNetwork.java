@@ -28,6 +28,7 @@ public final class StoryAuthorityNetwork {
   }
   public Id<? extends CustomPayload> getId(){return ID;}
  }
+ static void clear(ServerPlayerEntity p){RECEIPTS.remove(p);}
  public static void register(){
   if(registered)return;registered=true;
   PayloadTypeRegistry.playC2S().register(Request.ID,Request.CODEC);PayloadTypeRegistry.playS2C().register(Reply.ID,Reply.CODEC);

@@ -55,6 +55,7 @@ public final class DialogueBarrier{
  static void register(){
   SharedScene.register();PayloadTypeRegistry.playS2C().register(Cue.ID,Cue.CODEC);PayloadTypeRegistry.playC2S().register(Cue.ID,Cue.CODEC);
   ServerPlayNetworking.registerGlobalReceiver(Cue.ID,(cue,c)->c.server().execute(()->{
+   if(cue.kind.equals("scope_ack")){DuoTestMode.acknowledge(c.player(),cue.id);return;}
    var test=DuoTestMode.active(c.player());if(test!=null&&cue.kind.equals("read")){test.read(cue.id);return;}
    if(!cue.kind.equals("read")){SharedScene.response(c.player(),cue);return;}var r=run(c.server());var reader=r.readers.get(c.player().getUuid());
    if(reader!=null&&reader.id.equals(cue.id))r.readers.remove(c.player().getUuid());

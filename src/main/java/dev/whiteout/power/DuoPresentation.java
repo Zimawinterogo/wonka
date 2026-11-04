@@ -11,7 +11,8 @@ final class DuoPresentation {
  private static DialogueBarrier.Cue reading;
  static void register(){
   ClientPlayConnectionEvents.DISCONNECT.register((h,c)->{queue.clear();reading=null;SharedSceneClient.clear();});
-  ClientPlayNetworking.registerGlobalReceiver(DialogueBarrier.Cue.ID,(m,c)->c.client().execute(()->{if(!SharedSceneClient.control(m)&&queue.size()<32)queue.addLast(m);}));
+  ClientPlayNetworking.registerGlobalReceiver(DialogueBarrier.Cue.ID,(m,c)->c.client().execute(()->{if(m.kind().equals("test_scope")){queue.clear();reading=null;StoryAuthorityClient.cancel();if(c.client().currentScreen instanceof DialogueScreen)c.client().setScreen(null);
+   ClientPlayNetworking.send(new DialogueBarrier.Cue(m.id(),"scope_ack",""));return;}if(!SharedSceneClient.control(m)&&queue.size()<32)queue.addLast(m);}));
   ClientTickEvents.END_CLIENT_TICK.register(mc->{
    if(mc.player==null)return;
    if(reading!=null){

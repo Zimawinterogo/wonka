@@ -1,0 +1,31 @@
+{
+  "id": "final_mercy",
+  "durationTicks": 160,
+  "camera": [
+    {
+      "tick": 0,
+      "x": 3,
+      "y": 67,
+      "z": 4,
+      "yaw": 140,
+      "pitch": 12,
+      "fov": 70
+    },
+    {
+      "tick": 159,
+      "x": 1,
+      "y": 68,
+      "z": 5,
+      "yaw": 158,
+      "pitch": 12,
+      "fov": 70
+    }
+  ],
+  "events": [
+    {
+      "tick": 12,
+      "type": "MESSAGE",
+      "value": "Тестовая камера: mercy"
+    }
+  ]
+}

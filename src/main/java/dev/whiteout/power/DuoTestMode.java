@@ -21,6 +21,13 @@ import static net.minecraft.server.command.CommandManager.*;
 public final class DuoTestMode {
  public static final UUID BOT=UUID.nameUUIDFromBytes("whiteout:duo-test-bot".getBytes(java.nio.charset.StandardCharsets.UTF_8));
  private static final Map<MinecraftServer,DuoTestMode> sessions=new WeakHashMap<>();
+ private static final Map<ServerPlayerEntity,UUID> switching=new WeakHashMap<>();
+ static boolean switching(ServerPlayerEntity p){return switching.containsKey(p);}
+ static void acknowledge(ServerPlayerEntity p,UUID id){switching.remove(p,id);}
+ private static void changeScope(ServerPlayerEntity p){
+  StoryAuthorityNetwork.clear(p);
+  if(ServerPlayNetworking.canSend(p,DialogueBarrier.Cue.ID)){var id=UUID.randomUUID();switching.put(p,id);send(p,new DialogueBarrier.Cue(id,"test_scope",""));}
+ }
  final UUID operator;
  final Store store;
  final Path path;
@@ -67,7 +74,7 @@ public final class DuoTestMode {
  private TriggerEvidence evidence(UUID id){return id.equals(BOT)?botEvidence:humanEvidence;}
  private ScopedStory.Position at(UUID id,ServerPlayerEntity p){return id.equals(BOT)?botPosition:position(p);}
  private boolean eligible(ServerPlayerEntity p,UUID actor,StoryEventCatalog.Event e){
-  if(!started()||!connected&&(!alone||actor.equals(BOT))||!p.isAlive()||p.isSpectator()||e==null||e.serverOnly()||store.data.completedEvents.contains(Narrative.FINISHED)||SharedScene.current(store)!=null)return false;
+  if(!p.hasPermissionLevel(2)||!started()||!connected&&(!alone||actor.equals(BOT))||!p.isAlive()||p.isSpectator()||e==null||e.serverOnly()||store.data.completedEvents.contains(Narrative.FINISHED)||SharedScene.current(store)!=null)return false;
   var d=LobbyState.get(store);var n=e.narrative();var owner=actor;
   if(n!=null){
    if(n.mode()==Narrative.Mode.SOLO||!actor.equals(role(n.actor(),actor))||!Narrative.matches(store,d,n.when()))return false;
@@ -164,7 +171,7 @@ public final class DuoTestMode {
  }
  private void detach(ServerPlayerEntity p){
   var playing=SharedScene.current(store);if(playing!=null)send(p,new DialogueBarrier.Cue(playing.id(),"finish",""));
-  discardMarker();SharedScene.forget(store);sessions.remove(p.getServer());TriggerAuthority.reset(p);WhiteoutNetwork.sync(p);
+  discardMarker();SharedScene.forget(store);sessions.remove(p.getServer());changeScope(p);TriggerAuthority.reset(p);WhiteoutNetwork.sync(p);
  }
  private String status(){var r=readers.get(BOT);return "Подготовлен="+prepared+", запуск="+started()+", оператор="+(humanFirst?"FIRST":"SECOND")+", бот="+(connected?"онлайн":"офлайн")+", готов="+ready+", позиция="+botPosition+", диалог="+(r==null?"—":r.script)+", голоса="+ballots+", камера="+SharedScene.current(store);}
  private static final String[] COMMANDS={"enable confirm","disable","start","stop","role first","role second","follow","stay","here","ready","launch","disconnect","reconnect","alone","skip","status","reset confirm","read","reading manual","reading 60","load normal","load none","load 60","state","choices","choose","act","self","read-self","skip-self","signal","interact"};
@@ -174,18 +181,18 @@ public final class DuoTestMode {
    if(input.equals("enable confirm")){
     need(!sessions.containsKey(server),"Тест уже включён");need(!dev.whiteout.power.lobby.Party.member(LobbyState.get(Store.get(server)),p.getUuid())||!LobbyState.get(Store.get(server)).started(),"Завершите обычное прохождение или используйте копию мира");
     var dir=server.getSavePath(WorldSavePath.ROOT).resolve("whiteout-duo-tests");Files.createDirectories(dir);
-    var path=dir.resolve(p.getUuid()+".json");sessions.put(server,new DuoTestMode(p.getUuid(),path,position(p)));TriggerAuthority.reset(p);tell(p,"Тест включён. Используйте start");return 1;
+    var path=dir.resolve(p.getUuid()+".json");sessions.put(server,new DuoTestMode(p.getUuid(),path,position(p)));changeScope(p);TriggerAuthority.reset(p);tell(p,"Тест включён. Используйте start");return 1;
    }
    need(t!=null,"Сначала выполните enable confirm");
    switch(op){
-    case "start"->t.prepare();
+    case "start"->{t.prepare();WhiteoutNetwork.sync(p);}
     case "stop"->{t.detach(p);sessions.put(server,new DuoTestMode(p.getUuid(),t.path,position(p)));tell(p,"Бот удалён. Команда start вернёт тестовую сессию");return 1;}
     case "disable"->{t.detach(p);tell(p,"Сессия закрыта. Сохранён только отдельный тестовый файл");return 1;}
     case "role"->{need((LobbyState.get(t.store)==null||!LobbyState.get(t.store).started())&&Set.of("first","second").contains(arg),"Выберите first или second перед запуском");t.humanFirst=arg.equals("first");t.roster(false);}
     case "ready"->{need(t.prepared&&t.connected,"Бот недоступен");t.ready=true;}
     case "launch"->t.launch();
     case "follow","here","stay"->{need(t.connected,"Бот отключён");if(!op.equals("stay"))t.botPosition=position(p);if(!op.equals("here"))t.follow=op.equals("follow");}
-    case "disconnect","reconnect"->{boolean online=op.equals("reconnect");need(t.connected!=online,"Состояние уже установлено");t.connected=online;t.alone=false;t.ballots.clear();t.botSkip=false;t.camera=null;if(!t.started())t.ready=false;}
+    case "disconnect","reconnect"->{boolean online=op.equals("reconnect");need(t.connected!=online,"Состояние уже установлено");t.connected=online;SharedScene.peerChanged(t.store);t.alone=false;t.ballots.clear();t.botSkip=false;t.camera=null;if(!t.started())t.ready=false;}
     case "alone"->{need(t.started()&&!t.connected,"Бот должен быть отключён");t.alone=true;}
     case "read"->{need(t.connected&&t.readers.remove(BOT)!=null,"Бот не читает диалог");}
     case "reading"->t.readDelay=arg.equals("manual")?-1:delay(arg);
@@ -200,7 +207,7 @@ public final class DuoTestMode {
     case "skip-self"->{var scene=SharedScene.current(t.store);need(scene!=null,"Нет общей сцены");SharedScene.response(p,new DialogueBarrier.Cue(scene.id(),"skip",""));}
     case "choose","act","self"->{var e=StoryAuthority.definition(server,arg);need(!op.equals("choose")||e.trigger()!=null&&e.trigger().type()==TriggerEvidence.Kind.CHOICE,"Нужен ключ варианта диалога");var result=t.act(p,op.equals("self")?t.operator:BOT,arg);tell(p,"Результат: "+switch(result){case COMMITTED->"выполнено";case WAITING->"ожидание второго решения";default->"отклонено";});return result==StoryReceipts.Outcome.COMMITTED||result==StoryReceipts.Outcome.WAITING?1:0;}
     case "choices"->{var keys=new ArrayList<String>();for(var rule:StoryAuthority.catalog(server).rules())if(rule.binding().type()==TriggerEvidence.Kind.CHOICE&&t.admitted(p,BOT,StoryAuthority.definition(server,rule.key())))keys.add(rule.key());tell(p,"Допустимые ответы: "+keys);return 1;}
-    case "state"->{for(var who:List.of(t.operator,BOT)){var data=ScopedStory.read(t.store.data,ScopedStory.Scope.PLAYER,who);tell(p,(who.equals(BOT)?"Бот":"Игрок")+" · переменные "+Store.GSON.toJson(data.storyVariables)+" · события "+data.completedEvents+" · цели "+data.objectives.keySet()+" · точки "+data.checkpoints.keySet());}tell(p,"Общие события "+t.store.data.completedEvents);return 1;}
+    case "state"->{for(var who:List.of(t.operator,BOT)){var data=ScopedStory.read(t.store.data,ScopedStory.Scope.PLAYER,who);tell(p,(who.equals(BOT)?"Бот":"Игрок")+" · переменные "+Store.GSON.toJson(data.storyVariables)+" · события "+data.completedEvents+" · цели "+data.objectives.values().stream().map(o->o.id+"="+o.status+" ("+o.title+")").toList()+" · точки "+data.checkpoints.keySet());}tell(p,"Общие события "+t.store.data.completedEvents+" · тестовые выдачи "+((SceneDelivery.Access)(Object)t.store.data).whiteout$grants());return 1;}
     case "reset"->{need(arg.equals("confirm"),"Нужно reset confirm");t.detach(p);for(var suffix:List.of("",".bak",".tmp"))Files.deleteIfExists(t.path.resolveSibling(t.path.getFileName()+suffix));sessions.put(server,new DuoTestMode(p.getUuid(),t.path,position(p)));tell(p,"Удалён только ваш тестовый прогресс");return 1;}
     case "status"->{}
     default->throw new IllegalArgumentException("Доступные действия: "+String.join(", ",COMMANDS));
@@ -212,7 +219,7 @@ public final class DuoTestMode {
  static void register(){
   CommandRegistrationCallback.EVENT.register((cmd,reg,env)->cmd.register(literal("whiteout").then(literal("test-duo").requires(src->src.hasPermissionLevel(2)).executes(c->{c.getSource().sendFeedback(()->Text.literal(String.join(", ",COMMANDS)),false);return 1;}).then(argument("действие",StringArgumentType.greedyString()).suggests((c,b)->{for(var a:COMMANDS)if(a.startsWith(b.getRemaining()))b.suggest(a);return b.buildFuture();}).executes(c->command(c.getSource().getPlayerOrThrow(),StringArgumentType.getString(c,"действие")))))));
   ServerTickEvents.END_SERVER_TICK.register(s->{var t=sessions.get(s);if(t==null)return;var p=s.getPlayerManager().getPlayer(t.operator);if(p==null)return;if(!p.hasPermissionLevel(2)){t.detach(p);return;}try{t.tick(p);}catch(Exception ex){if(s.getTicks()%200==0)tell(p,"Ошибка теста: "+ex.getMessage());}});
-  ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{var t=active(h.getPlayer());if(t!=null){t.discardMarker();SharedScene.forget(t.store);sessions.remove(s);}});
+  ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{switching.remove(h.getPlayer());var t=active(h.getPlayer());if(t!=null){t.discardMarker();SharedScene.forget(t.store);sessions.remove(s);}});
   ServerLifecycleEvents.SERVER_STOPPED.register(sessions::remove);
  }
 }

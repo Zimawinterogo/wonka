@@ -15,6 +15,12 @@ public class DialogueRouteClientProbe {
   registry.remove(script.id());
   var director=dev.whiteout.client.director.DirectorPlayer.class;
   if(Arrays.stream(director.getDeclaredMethods()).noneMatch(m->m.getName().contains("whiteout$pause"))||Arrays.stream(director.getDeclaredMethods()).noneMatch(m->m.getName().contains("whiteout$vote")))throw new AssertionError("shared scene control mixins absent");
+  var samples=java.nio.file.Path.of("../../docs/examples/duo-client/config/whiteout");var config=java.nio.file.Path.of("config/whiteout");java.nio.file.Files.createDirectories(config.resolve("cutscenes"));
+  java.nio.file.Files.copy(samples.resolve("dialogues.json"),config.resolve("dialogues.json"),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+  for(var id:List.of("loss","mercy","letter"))java.nio.file.Files.copy(samples.resolve("cutscenes/final_"+id+".json"),config.resolve("cutscenes/final_"+id+".json"),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+  DialogueManager.load();dev.whiteout.client.director.DirectorLibrary.load();
+  if(DialogueManager.findById("final_second").lines().getFirst().choices().size()!=2||DialogueManager.findById("letter")==null)throw new AssertionError("test replies not loaded");
+  for(var id:List.of("loss","mercy","letter")){var clip=dev.whiteout.client.director.DirectorLibrary.get("final_"+id);if(clip==null||clip.camera.size()!=2||clip.durationTicks!=160)throw new AssertionError("test camera "+id);}
   var runtime=dev.whiteout.client.StoryRuntime.class;
   if(Arrays.stream(runtime.getDeclaredMethods()).noneMatch(m->m.getName().contains("authorizedFire")))throw new AssertionError("StoryRuntime authority Mixin absent");
   if(Arrays.stream(dev.whiteout.client.director.DirectorTriggerManager.class.getDeclaredMethods()).noneMatch(m->m.getName().contains("serverManaged")))throw new AssertionError("Migrated trigger guard absent");

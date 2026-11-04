@@ -36,6 +36,9 @@ public final class PhotoTransfer{
  }
  private static final Map<ServerPlayerEntity,Assembly> uploads=new WeakHashMap<>();
  private static final Map<ServerPlayerEntity,Long> gate=new WeakHashMap<>();
+ public static boolean reserve(Set<Integer> inflight,int index,java.util.function.BooleanSupplier hasBudget){
+  return !inflight.contains(index)&&hasBudget.getAsBoolean()&&inflight.add(index);
+ }
  private record Downloads(long start,int count){}
  private static final Map<ServerPlayerEntity,Downloads> downloads=new WeakHashMap<>();
  private static boolean downloadAllowed(ServerPlayerEntity player){long now=System.nanoTime();var window=downloads.get(player);
@@ -83,8 +86,7 @@ public final class PhotoTransfer{
   if(state==null||state.revision()!=m.revision||m.index<0||m.index>=state.photos().size())return;
   var photo=state.photos().get(m.index);
   if(get){
-   var inflight=fetched.computeIfAbsent(p,k->new HashSet<>());if(inflight.contains(m.index)||!downloadAllowed(p))return;
-   inflight.add(m.index);
+   var inflight=fetched.computeIfAbsent(p,k->new HashSet<>());if(!reserve(inflight,m.index,()->downloadAllowed(p)))return;
    Path path=folder(p).resolve(photo.hash()+".rgb");var server=p.getServer();
    async(()->{try{if(Files.size(path)!=BYTES)throw new java.io.IOException();byte[] bytes=Files.readAllBytes(path);
     if(!hash(bytes).equals(photo.hash()))throw new java.io.IOException();

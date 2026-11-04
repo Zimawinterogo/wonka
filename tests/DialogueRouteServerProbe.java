@@ -8,7 +8,7 @@ public class DialogueRouteServerProbe {
   net.minecraft.SharedConstants.createGameVersion();net.minecraft.Bootstrap.initialize();
   DialogueRouteNetwork.register();
   StoryAuthority.register();
-  ScopedStoryProbe.run();
+  ScopedStoryProbe.run();DuoTestProbe.run();
   long guards=java.util.Arrays.stream(dev.whiteout.net.WhiteoutNetwork.class.getDeclaredMethods())
    .filter(m->m.getName().contains("whiteout$before")).count();
   if(guards!=1)throw new AssertionError("Server story authority Mixin was not applied: "+guards);

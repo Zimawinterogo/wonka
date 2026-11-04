@@ -110,13 +110,21 @@ def exercise_duo(command, wait):
         move(12)
         action("start")
         action("start", False)
-        action("role first")
+        action("role second" if branch == "mercy" else "role first")
         action("launch", False)
         action("ready")
         action("launch")
         action("disconnect")
         action("choose dialogue_choice:final_second:0:0", False)
         action("reconnect")
+        if branch == "loss":
+            move(8)
+            action("self dialogue_choice:qa_vote:0:0")
+            action("choose dialogue_choice:qa_vote:0:1")
+            assert "dialogue_choice:qa_vote:0:0" not in progress()["completedEvents"]
+            action("choose dialogue_choice:qa_vote:0:0")
+            assert "dialogue_choice:qa_vote:0:0" in progress()["completedEvents"]
+            move(12)
         if branch == "letter":
             move(-12)
             action("choose dialogue_choice:letter:0:0")
@@ -127,16 +135,26 @@ def exercise_duo(command, wait):
         assert "cutscene_trigger:final_meeting" not in progress().get("completedEvents", [])
         action("follow")
         time.sleep(.6)
-        action("read-self")
+        if branch == "mercy":
+            action("read")
+            action("choose dialogue_choice:final_second:0:1", False)
+        else:
+            action("read-self")
         choice = "0" if branch == "loss" else "1"
-        action("choose dialogue_choice:final_second:0:" + choice)
-        action("choose dialogue_choice:final_second:0:" + choice, False)
+        actor = "self" if branch == "mercy" else "choose"
+        action(actor+" dialogue_choice:final_second:0:" + choice)
+        action(actor+" dialogue_choice:final_second:0:" + choice, False)
         assert "whiteout:ending/"+branch in progress()["completedEvents"]
         action("disconnect")
         action("reconnect")
         # This headless operator never acknowledges the Director camera.
         # Verify that the bounded production fallback actually completes the canonical exit.
-        end = time.monotonic() + 32
+        if branch == "mercy":
+            time.sleep(10.8)
+            action("skip-self")
+            assert "whiteout:example/mercy_exit" not in progress()["completedEvents"]
+            action("skip")
+        end = time.monotonic() + (4 if branch == "mercy" else 32)
         while "whiteout:example/"+branch+"_exit" not in progress()["completedEvents"]:
             if time.monotonic() >= end:
                 raise AssertionError("Scene loading timeout did not recover")
@@ -152,7 +170,14 @@ boot(False)
 carpet = mods / "carpet-qa.jar"
 urllib.request.urlretrieve("https://cdn.modrinth.com/data/TQTTVgYE/versions/f2mvlGrg/fabric-carpet-1.21-1.4.147%2Bv240613.jar", carpet)
 assert hashlib.sha512(carpet.read_bytes()).hexdigest() == "e6f33d13406796a34e7598d997113f25f7bea3e55f9d334b73842adda52b2c5d0a86b7b12ac812d7e758861e3f468bf201c6c710c40162bb79d6818938204151"
-shutil.copy2(root/"docs/examples/duo-final-events.json", server/"world/whiteout-story-events.json")
+catalog = json.loads((root/"docs/examples/duo-final-events.json").read_text(encoding="utf8"))
+options = ["dialogue_choice:qa_vote:0:0","dialogue_choice:qa_vote:0:1"]
+catalog["events"].append(dict(key="cutscene_trigger:qa_vote",once=True,conditions=[],actions=[],
+    area=dict(dimension="minecraft:overworld",box=dict(x1=7,y1=62,z1=-1,x2=10,y2=67,z2=3)),
+    trigger=dict(type="ENTER_BOX",nextChoices=options),narrative=dict(together=True)))
+for key in options:
+    catalog["events"].append(dict(key=key,once=True,conditions=[],actions=[],trigger=dict(type="CHOICE"),narrative=dict(voteGroup="qa_vote")))
+(server/"world/whiteout-story-events.json").write_text(json.dumps(catalog),encoding="utf8")
 with (server/"server.properties").open("a") as props:
     props.write("\nonline-mode=false\n")
 boot(False, test_duo=True)

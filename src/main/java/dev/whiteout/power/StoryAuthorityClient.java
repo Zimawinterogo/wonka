@@ -48,6 +48,7 @@ public final class StoryAuthorityClient {
  }
  private static void finish(boolean value){var callback=finished;reset();if(callback!=null)callback.accept(value);}
  public static boolean busy(){return SESSION.busy();}
+ static void cancel(){reset();deferred=null;deferredKey=null;}
  public static void reset(){SESSION.clear();earlyAgreement=null;world=null;valid=ready=present=null;finished=null;}
  public static boolean request(String key,BooleanSupplier stillValid,BooleanSupplier canPresent,BooleanSupplier action,Consumer<Boolean> callback){
   var mc=MinecraftClient.getInstance();

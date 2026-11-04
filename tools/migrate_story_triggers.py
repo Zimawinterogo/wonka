@@ -148,10 +148,27 @@ def main(argv=None):
     parser.add_argument('--scenes', type=Path, help='Directory containing generated wdlg_*.json scenes')
     parser.add_argument('--output', type=Path, help='Create a NEW candidate file; otherwise print a preview')
     parser.add_argument('--dialogues', type=Path, help='Legacy dialogue definitions referenced by these triggers')
+    parser.add_argument('--audit', action='store_true', help='Read-only report of supported bindings and rejected definitions')
     args = parser.parse_args(argv)
+    if args.audit and args.output:
+        parser.error('--audit cannot write an output file')
     try:
         dialogues = read_json(args.dialogues) if args.dialogues else None
-        result = json.dumps(convert(read_json(args.triggers), args.scenes, dialogues), ensure_ascii=False, indent=2, allow_nan=False) + '\n'
+        source = read_json(args.triggers)
+        if args.audit:
+            errors = []
+            for index, trigger in enumerate(source['triggers']):
+                try:
+                    convert({'triggers': [trigger]}, args.scenes, dialogues)
+                except (ValueError, KeyError, TypeError, AttributeError, IndexError) as problem:
+                    errors.append({'index': index, 'reason': str(problem)})
+            if errors:
+                print(json.dumps({'rejected': errors}, ensure_ascii=False, indent=2))
+                return 2
+            catalog = convert(source, args.scenes, dialogues)
+            print(json.dumps({'bindings': [{'key': e['key'], 'type': e['trigger']['type'], 'delayTicks': e['trigger'].get('delayTicks', 0)} for e in catalog['events']]}, ensure_ascii=False, indent=2))
+            return 0
+        result = json.dumps(convert(source, args.scenes, dialogues), ensure_ascii=False, indent=2, allow_nan=False) + '\n'
         if len(result.encode('utf-8')) > 262144:
             raise ValueError('Catalog exceeds 256 KiB')
         if args.output:
@@ -164,4 +181,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

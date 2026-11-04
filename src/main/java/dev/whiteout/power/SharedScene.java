@@ -33,7 +33,7 @@ public final class SharedScene{
   if(ServerPlayNetworking.canSend(p,DialogueBarrier.Cue.ID))ServerPlayNetworking.send(p,new DialogueBarrier.Cue(r.id,kind,value));
  }
  static void response(ServerPlayerEntity p,DialogueBarrier.Cue cue){
-  var s=p.getServer();var test=DuoTestMode.active(p);var store=test==null?Store.get(s):test.store;var r=current(store);var d=LobbyState.get(store);var session=runtime.get(store);
+  var s=p.getServer();var test=DuoTestMode.active(p);if(test!=null&&!p.hasPermissionLevel(2))return;var store=test==null?Store.get(s):test.store;var r=current(store);var d=LobbyState.get(store);var session=runtime.get(store);
   if(r==null||session==null||!r.id.equals(cue.id())||!Party.member(d,p.getUuid())||!session.sent.contains(p.getUuid()))return;
   if(cue.kind().equals("load_error")&&!session.loaded.contains(p.getUuid())){fallback(p,r,session);return;}
   if(cue.kind().equals("loaded"))session.loaded.add(p.getUuid());else if(cue.kind().equals("skip")&&session.loaded.contains(p.getUuid()))session.votes.add(p.getUuid());
@@ -66,6 +66,7 @@ public final class SharedScene{
    }
   }catch(Exception ex){if(s.getTicks()%200==0)org.slf4j.LoggerFactory.getLogger("whiteout-story").warn("Shared scene waiting for completion",ex);}
  }
+ static void peerChanged(Store store){var state=runtime.get(store);if(state!=null)state.votes.clear();}
  static void forget(Store store){runtime.remove(store);}
  static void register(){SceneDelivery.register();ServerTickEvents.END_SERVER_TICK.register(s->tick(s,Store.get(s),null));ServerLifecycleEvents.SERVER_STOPPED.register(s->runtime.clear());
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{var st=runtime.get(Store.get(s));if(st!=null){UUID id=h.getPlayer().getUuid();st.sent.remove(id);st.loaded.remove(id);st.votes.clear();st.requested.remove(id);}});}
