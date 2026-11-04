@@ -5,6 +5,8 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": ["ZoneHistoryMixin", "PlayerStoryDataMixin", "StoryStoreMixin", "ScopedCheckpointMixin"],
   "client": [
+    "LobbyColdMixin",
+    "LobbyBatteryMixin",
     "MigratedTriggerMixin",
     "StoryRuntimeAuthorityMixin",
     "DialogueChoiceAuthorityMixin",

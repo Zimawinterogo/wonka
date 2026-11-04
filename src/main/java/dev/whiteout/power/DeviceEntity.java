@@ -28,7 +28,7 @@ public final class DeviceEntity extends BlockEntity {
  public final GeneratorMotion clientMotion=new GeneratorMotion();
  public int fuel;public boolean fuse;public boolean burnt;public boolean unstableFuse;
  public float fuseFailureChance=UnstableFusePolicy.FAILURE_CHANCE;
- private long nextFuseCheck;
+ private long nextFuseCheck;private int fuelRemainder;
  private UUID operator;private long epoch,expires;private int progress;
  private BlockPos supply;
  public DeviceEntity(BlockPos p,BlockState s){super(PowerDevices.ENTITY,p,s);}
@@ -39,7 +39,9 @@ public final class DeviceEntity extends BlockEntity {
   if(LakeStory.blocked(w,p)||LakeStory.brokenHome(w,p)){if(e.active())e.emergencyStop();}
   if(e.kind()==0||e.kind()==3){
    if(e.active()){
-    if(e.fuel>0)e.fuel--;
+    var balance=dev.whiteout.power.lobby.Balance.get(w);
+    if(e.fuel>0){int rate=balance==null?100:e.kind()==3?balance.oldFuel():balance.newFuel();
+     e.fuelRemainder+=rate;e.fuel=Math.max(0,e.fuel-e.fuelRemainder/100);e.fuelRemainder%=100;}
     if(e.fuel<=0){e.setActive(false);e.stopSound();}
     if(w.getTime()%20==0)e.markDirty();
     if(e.kind()==3)GridManager.oldGeneratorTick((ServerWorld)w,e);
@@ -47,14 +49,15 @@ public final class DeviceEntity extends BlockEntity {
    if(e.operator!=null){PlayerEntity player=w.getPlayerByUuid(e.operator);if(w.getTime()>e.expires||player==null||!player.isAlive()||player.squaredDistanceTo(p.toCenterPos())>36){if(player instanceof ServerPlayerEntity sp)e.send(sp,4);e.operator=null;}}
   }else if(e.kind()==1){
    if(w.getTime()%20==0)GridManager.panelTick((ServerWorld)w,e);
+   var tuning=dev.whiteout.power.lobby.Balance.get(w);int interval=tuning==null?UnstableFusePolicy.INTERVAL_TICKS:20*tuning.fuseSeconds();
    if(e.unstableFuse&&e.fuse&&!e.burnt&&e.active()){
-    if(e.nextFuseCheck==0)e.nextFuseCheck=w.getTime()+UnstableFusePolicy.INTERVAL_TICKS;
+    if(e.nextFuseCheck==0)e.nextFuseCheck=w.getTime()+interval;
     if(UnstableFusePolicy.shouldCheck(e.fuse,e.burnt,true,w.getTime(),e.nextFuseCheck)){
-     e.nextFuseCheck=w.getTime()+UnstableFusePolicy.INTERVAL_TICKS;
-     if(UnstableFusePolicy.blows(w.random.nextFloat(),e.fuseFailureChance))e.blownUnstableFuse((ServerWorld)w);
+     e.nextFuseCheck=w.getTime()+interval;
+     if(UnstableFusePolicy.blows(w.random.nextFloat(),tuning==null?e.fuseFailureChance:tuning.fusePercent()/100f))e.blownUnstableFuse((ServerWorld)w);
      else e.markDirty();
     }
-   }else if(e.unstableFuse&&e.nextFuseCheck!=0){e.nextFuseCheck=w.getTime()+UnstableFusePolicy.INTERVAL_TICKS;}
+   }else if(e.unstableFuse&&e.nextFuseCheck!=0){e.nextFuseCheck=w.getTime()+interval;}
   }
  }
 
@@ -162,8 +165,8 @@ public final class DeviceEntity extends BlockEntity {
  }
  public void sync(){if(world instanceof ServerWorld sw)WhiteoutWorldState.invalidatePower(sw.getServer());markDirty();if(world!=null&&!world.isClient)world.updateListeners(pos,getCachedState(),getCachedState(),3);}
  public void dropContents(){if(world==null||world.isClient)return;for(int i=0;i<stacks.size();i++){net.minecraft.block.Block.dropStack(world,pos,stacks.get(i));stacks.set(i,ItemStack.EMPTY);}if(fuse&&!burnt){net.minecraft.block.Block.dropStack(world,pos,new ItemStack(unstableFuse?PowerDevices.UNSTABLE_FUSE:PowerDevices.FUSE));}fuse=false;burnt=false;unstableFuse=false;nextFuseCheck=0;}
- @Override protected void writeNbt(NbtCompound n,RegistryWrapper.WrapperLookup r){super.writeNbt(n,r);n.putInt("Fuel",fuel);n.putFloat("FuseFailureChance",fuseFailureChance);n.putBoolean("Fuse",fuse);n.putBoolean("Burnt",burnt);n.putBoolean("UnstableFuse",unstableFuse);n.putLong("FuseNextCheck",nextFuseCheck);Inventories.writeNbt(n,stacks,r);}
- @Override protected void readNbt(NbtCompound n,RegistryWrapper.WrapperLookup r){super.readNbt(n,r);fuel=MathHelper.clamp(n.getInt("Fuel"),0,MAX_FUEL);fuseFailureChance=n.contains("FuseFailureChance")?n.getFloat("FuseFailureChance"):UnstableFusePolicy.FAILURE_CHANCE;if(!Float.isFinite(fuseFailureChance))fuseFailureChance=UnstableFusePolicy.FAILURE_CHANCE;fuseFailureChance=MathHelper.clamp(fuseFailureChance,0,1);fuse=n.getBoolean("Fuse");burnt=n.getBoolean("Burnt");unstableFuse=n.getBoolean("UnstableFuse");nextFuseCheck=n.getLong("FuseNextCheck");stacks.clear();Inventories.readNbt(n,stacks,r);}
+ @Override protected void writeNbt(NbtCompound n,RegistryWrapper.WrapperLookup r){super.writeNbt(n,r);n.putInt("Fuel",fuel);n.putInt("FuelRemainder",fuelRemainder);n.putFloat("FuseFailureChance",fuseFailureChance);n.putBoolean("Fuse",fuse);n.putBoolean("Burnt",burnt);n.putBoolean("UnstableFuse",unstableFuse);n.putLong("FuseNextCheck",nextFuseCheck);Inventories.writeNbt(n,stacks,r);}
+ @Override protected void readNbt(NbtCompound n,RegistryWrapper.WrapperLookup r){super.readNbt(n,r);fuelRemainder=Math.floorMod(n.getInt("FuelRemainder"),100);fuel=MathHelper.clamp(n.getInt("Fuel"),0,MAX_FUEL);fuseFailureChance=n.contains("FuseFailureChance")?n.getFloat("FuseFailureChance"):UnstableFusePolicy.FAILURE_CHANCE;if(!Float.isFinite(fuseFailureChance))fuseFailureChance=UnstableFusePolicy.FAILURE_CHANCE;fuseFailureChance=MathHelper.clamp(fuseFailureChance,0,1);fuse=n.getBoolean("Fuse");burnt=n.getBoolean("Burnt");unstableFuse=n.getBoolean("UnstableFuse");nextFuseCheck=n.getLong("FuseNextCheck");stacks.clear();Inventories.readNbt(n,stacks,r);}
  @Override public BlockEntityUpdateS2CPacket toUpdatePacket(){return BlockEntityUpdateS2CPacket.create(this);}
  @Override public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup r){return createNbt(r);}
 }

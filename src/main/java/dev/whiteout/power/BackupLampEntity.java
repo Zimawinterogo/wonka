@@ -20,7 +20,8 @@ public final class BackupLampEntity extends BlockEntity {
   if(world.isClient)return;
   if(entity.linked){
    int previous=entity.charge,oldRemainder=entity.progressRemainder;
-   var timing=BackupLampPolicy.timing(world.getDifficulty());
+   var balance=dev.whiteout.power.lobby.Balance.get(world);
+   var timing=balance==null?BackupLampPolicy.timing(world.getDifficulty()):new BackupLampPolicy.Timing(balance.lampMinutes()*1200,balance.chargeMinutes()*1200);
    int duration=entity.gridPowered?timing.chargeTicks():timing.outageTicks();
    if(entity.progressDuration>0&&entity.progressDuration!=duration)
     entity.progressRemainder=(int)((long)Math.floorMod(entity.progressRemainder,entity.progressDuration)*duration/entity.progressDuration);
