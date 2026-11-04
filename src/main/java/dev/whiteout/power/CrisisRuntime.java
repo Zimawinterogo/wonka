@@ -59,7 +59,7 @@ public final class CrisisRuntime {
    if(server.getCurrentPlayerCount()<=1)for(View v:s.director.status())if(!s.scenes.owns(v.id()))s.director.cancel(v.id(),s.tick,"last player disconnected");
   });
   ServerTickEvents.END_SERVER_TICK.register(server->{
-   Slot s=SERVERS.get(server);if(s==null||server.getCurrentPlayerCount()==0)return;s.tick++;
+   Slot s=SERVERS.get(server);if(s==null||server.getCurrentPlayerCount()==0||dev.whiteout.power.lobby.Party.paused(server))return;s.tick++;
    if(!s.director.enabled()||s.tick%10!=0)return;
    s.scenes.reconcile(s.director,s.tick);
    var source=new CrisisWorldSource(server);

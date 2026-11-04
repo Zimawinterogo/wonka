@@ -168,7 +168,7 @@ public final class CrisisScenes {
    if(!StoryRules.matches(store.data.storyVariables,event.conditions())){reasons.put(id,"story conditions false");return false;}
    int inspected=0;
    for(var player:server.getPlayerManager().getPlayerList()){
-    if(!player.isAlive()||player.isSpectator()||!player.getServerWorld().getRegistryKey().getValue().toString().equals(scene.dimension()))continue;
+    if(!player.isAlive()||player.isSpectator()||!dev.whiteout.power.lobby.Party.active(player)||!player.getServerWorld().getRegistryKey().getValue().toString().equals(scene.dimension()))continue;
     if(++inspected>8)break;
     if(event.area().contains(scene.dimension(),player.getX(),player.getY(),player.getZ())&&StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,store.data))==Truth.TRUE){reasons.remove(id);return true;}
    }

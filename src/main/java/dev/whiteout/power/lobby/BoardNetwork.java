@@ -41,12 +41,14 @@ public final class BoardNetwork{
   var session=new Session(p.getServerWorld(),root.toImmutable(),UUID.randomUUID());sessions.put(p,session);PhotoTransfer.opened(p);
   var store=Store.get(p.getServer());if(store.error!=null){sessions.remove(p);p.sendMessage(Text.translatable("story.whiteout.request_denied"));return;}
   var state=LobbyState.get(store);
+  Party.send(p,session.token);
   ServerPlayNetworking.send(p,new View(session.token,state==null?0:state.revision(),p.isCreative()&&p.hasPermissionLevel(2),state!=null&&state.started(),state==null?null:state.card(),JSON.toJson(state==null?List.of():state.photos())));
  }
  static boolean access(ServerPlayerEntity p,UUID token,boolean editor){
   var s=sessions.get(p);return s!=null&&s.token.equals(token)&&valid(p,s)&&(!editor||p.isCreative()&&p.hasPermissionLevel(2));
  }
  static void refresh(ServerPlayerEntity p){var s=sessions.get(p);if(valid(p,s))open(p,s.root);}
+ static void notifyParty(net.minecraft.server.MinecraftServer server){sessions.forEach((p,s)->{if(p.getServer()==server&&valid(p,s))Party.send(p,s.token);});}
  private static boolean valid(ServerPlayerEntity p,Session s){
   if(s==null||p.getServerWorld()!=s.world||!p.isAlive()||p.isSpectator()||!s.world.isChunkLoaded(s.root))return false;
   var state=s.world.getBlockState(s.root);
@@ -65,7 +67,7 @@ public final class BoardNetwork{
     dev.whiteout.net.WhiteoutNetwork.syncAll(server);
     c.getSource().sendFeedback(()->Text.translatable("board.whiteout.reset"),true);return 1;
    }))))));
-  PhotoTransfer.register();
+  Party.register();PhotoTransfer.register();
   PayloadTypeRegistry.playS2C().register(View.ID,View.CODEC);PayloadTypeRegistry.playC2S().register(Change.ID,Change.CODEC);
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->sessions.remove(h.getPlayer()));
   ServerPlayNetworking.registerGlobalReceiver(Change.ID,(msg,ctx)->ctx.server().execute(()->{
@@ -76,9 +78,9 @@ public final class BoardNetwork{
    var store=Store.get(ctx.server());
    try{
     if(msg.card!=null){if(!p.isCreative()||!p.hasPermissionLevel(2))return;LobbyState.edit(store,msg.revision,msg.card);}
-    else LobbyState.startSolo(store,msg.revision,p.getUuid());
-   }catch(java.io.IOException|IllegalStateException failure){p.sendMessage(Text.translatable("story.whiteout.request_denied"));}
-   open(p,session.root);
+    else Party.launch(p,msg.revision);
+   }catch(Exception failure){p.sendMessage(Text.translatable("story.whiteout.request_denied"));}
+   open(p,session.root);notifyParty(ctx.server());
    if(msg.card==null)dev.whiteout.net.WhiteoutNetwork.syncAll(ctx.server());
   }));
  }

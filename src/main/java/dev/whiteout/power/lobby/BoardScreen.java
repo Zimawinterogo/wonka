@@ -18,7 +18,7 @@ public final class BoardScreen extends SharpScreen {
  private static Text tr(String key){return Text.translatable("board.whiteout."+key);}
  BoardScreen(BoardNetwork.View data){super(tr("board"));this.data=data;}
  public static void register(){
-  PhotoScreen.register();
+  PartyScreen.register();PhotoScreen.register();
   ClientPlayNetworking.registerGlobalReceiver(BoardNetwork.View.ID,(msg,ctx)->ctx.client().execute(()->{PhotoScreen.opened(msg,ctx.client());ctx.client().setScreen(new BoardScreen(msg));}));
  }
  private int w(){return Math.min(width-16,374);}
@@ -49,11 +49,16 @@ public final class BoardScreen extends SharpScreen {
   }
   if(data.editor()&&!data.started())button(Text.literal("⚙"),x+w-34,y+6,26,()->{editing=true;clearAndInit();}).setTooltip(Tooltip.of(tr("edit")));
   if(data.card()!=null&&(data.editor()||!PhotoTransfer.pictures(data).isEmpty()))button(Text.literal("Фото"),x+w-91,y+6,52,()->client.setScreen(new PhotoScreen(data)));
-  if(lines().size()>9){
-   button(Text.literal("‹"),x+10,y+166,24,()->{page--;clearAndInit();}).active=page>0;
-   button(Text.literal("›"),x+w-34,y+166,24,()->{page++;clearAndInit();}).active=(page+1)*9<lines().size();
+  if(data.card()!=null){
+   button(Text.literal("Участники"),x+12,y+140,74,()->client.setScreen(new PartyScreen(data,0)));
+   button(Text.literal("Сложность"),x+90,y+140,76,()->client.setScreen(new PartyScreen(data,2)));
+   if(data.editor()&&!data.started())button(Text.literal("Место старта"),x+170,y+140,87,()->client.setScreen(new PartyScreen(data,1)));
   }
-  var start=button(tr(data.started()?"started":"start"),x+w/2-81,y+167,162,()->send(null));start.active=data.card()!=null&&!data.started();
+  if(lines().size()>8){
+   button(Text.literal("‹"),x+10,y+166,24,()->{page--;clearAndInit();}).active=page>0;
+   button(Text.literal("›"),x+w-34,y+166,24,()->{page++;clearAndInit();}).active=(page+1)*8<lines().size();
+  }
+  var start=button(tr(data.started()?"started":"start"),x+w/2-81,y+167,162,()->send(null));start.active=data.card()!=null&&!data.started()&&PartyScreen.state!=null&&data.token().equals(PartyScreen.token)&&PartyScreen.state.canStart();
  }
  private java.util.List<net.minecraft.text.OrderedText> lines(){
   var lines=new java.util.ArrayList<net.minecraft.text.OrderedText>();var v=values();
@@ -79,8 +84,8 @@ public final class BoardScreen extends SharpScreen {
    int row=y+38;
    if(c==null)d.drawTextWrapped(textRenderer,tr("empty"),x+22,row,w-44,0x504336);
    else{
-    var lines=lines();page=Math.min(page,Math.max(0,(lines.size()-1)/9));
-    for(int i=page*9;i<Math.min(lines.size(),(page+1)*9);i++){d.drawText(textRenderer,lines.get(i),x+22,row,0x504336,false);row+=12;}
+    var lines=lines();page=Math.min(page,Math.max(0,(lines.size()-1)/8));
+    for(int i=page*8;i<Math.min(lines.size(),(page+1)*8);i++){d.drawText(textRenderer,lines.get(i),x+22,row,0x504336,false);row+=12;}
    }
   }
   super.render(d,mx,my,dt);

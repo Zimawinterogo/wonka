@@ -48,7 +48,7 @@ public final class TriggerAuthority {
  }
  private static boolean eligible(ServerPlayerEntity p,Session session,String key){
   var store=Store.get(p.getServer());
-  return store.error==null&&session.catalog().eligible(key,store.data,p);
+  return store.error==null&&dev.whiteout.power.lobby.Party.active(p)&&session.catalog().eligible(key,store.data,p);
  }
  private static boolean position(TriggerEvidence.Rule r,ServerPlayerEntity p){
   if(r.binding().zone())return r.area().dimension().equals(body(p).dimension())&&body(p).intersects(r.area())==(r.binding().type()==TriggerEvidence.Kind.ENTER_BOX);

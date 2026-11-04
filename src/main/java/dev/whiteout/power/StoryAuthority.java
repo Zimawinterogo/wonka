@@ -91,7 +91,7 @@ public final class StoryAuthority {
    if(definitions.invalid())throw new IllegalStateException("invalid server catalog");
    StoryEventCatalog.Event event=definitions.find(key);
    if(event==null)throw new IllegalArgumentException("unregistered story key");
-   if(event.serverOnly())throw new IllegalArgumentException("event is server-only");
+   if(event.serverOnly()||!dev.whiteout.power.lobby.Party.active(player))throw new IllegalArgumentException("event unavailable to participant");
    for(var scene:event.scenes())if(!CrisisRuntime.requestable(player.getServer(),scene))throw new IllegalArgumentException("scene unavailable: "+scene.id());
    if(event.trigger()!=null){
     if(!TriggerAuthority.permits(player,key))return StoryReceipts.Outcome.DENIED;
