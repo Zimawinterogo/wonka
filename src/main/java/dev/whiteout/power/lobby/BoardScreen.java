@@ -11,6 +11,7 @@ import net.minecraft.util.Identifier;
 public final class BoardScreen extends SharpScreen {
  private final BoardNetwork.View data;
  private boolean editing,detail;
+ private boolean started(){return data.token().equals(PartyScreen.token)&&PartyScreen.state!=null?PartyScreen.state.started():data.started();}
  void changed(java.util.UUID token){if(data.token().equals(token)&&!editing)clearAndInit();}
  private int page;
  private final TextFieldWidget[] fields=new TextFieldWidget[5];
@@ -56,7 +57,7 @@ public final class BoardScreen extends SharpScreen {
    if(lines().size()>8){button(Text.literal("‹"),x+w/2-26,y+167,24,()->{page--;clearAndInit();}).active=page>0;
     button(Text.literal("›"),x+w/2+2,y+167,24,()->{page++;clearAndInit();}).active=(page+1)*8<lines().size();}return;
   }
-  if(data.editor()&&!data.started()){var gear=button(Text.literal("⚙"),x+w-35,y+5,25,()->{editing=true;clearAndInit();});if(PersonalScreen.prefs().hints())gear.setTooltip(Tooltip.of(tr("edit")));}
+  if(data.editor()&&!started()){var gear=button(Text.literal("⚙"),x+w-35,y+5,25,()->{editing=true;clearAndInit();});if(PersonalScreen.prefs().hints())gear.setTooltip(Tooltip.of(tr("edit")));}
   if(data.card()!=null){
    int right=x+w*56/100,rw=w-(right-x)-13;
    button(Text.literal("Карточка истории"),x+16,y+121,right-x-26,()->{detail=true;clearAndInit();});
@@ -64,7 +65,7 @@ public final class BoardScreen extends SharpScreen {
    button(Text.literal("Сложность"),right,y+85,rw,()->client.setScreen(new PartyScreen(data,2)));
    button(Text.literal("Личные настройки"),right,y+122,rw,()->client.setScreen(new PersonalScreen(data)));
   }
-  var start=button(tr(data.started()?"started":"start"),x+w/2-81,y+167,162,()->send(null));start.active=data.card()!=null&&!data.started()&&PartyScreen.state!=null&&data.token().equals(PartyScreen.token)&&PartyScreen.state.canStart();
+  var start=button(tr(started()?"started":"start"),x+w/2-81,y+167,162,()->send(null));start.active=data.card()!=null&&!started()&&PartyScreen.state!=null&&data.token().equals(PartyScreen.token)&&PartyScreen.state.canStart();
  }
  private java.util.List<net.minecraft.text.OrderedText> lines(){
   var lines=new java.util.ArrayList<net.minecraft.text.OrderedText>();var v=values();

@@ -110,7 +110,7 @@ public final class DeviceEntity extends BlockEntity {
     ServerPlayNetworking.send(p,new PowerNetwork.FuseSettings(pos,Math.round(fuseFailureChance*100)));return;
    }
    if(burnt&&p.isSneaking()&&held.isEmpty()){burnt=false;fuse=false;unstableFuse=false;nextFuseCheck=0;setActive(false);sound(PowerDevices.CLICK,.65f);sync();GridManager.refresh(p.getServer());message(p,"fuse_burnt_removed");}
-   else if(!fuse&&(held.isOf(PowerDevices.FUSE)||held.isOf(PowerDevices.UNSTABLE_FUSE))){fuse=true;burnt=false;unstableFuse=held.isOf(PowerDevices.UNSTABLE_FUSE);nextFuseCheck=world.getTime()+UnstableFusePolicy.INTERVAL_TICKS;if(!p.isCreative())held.decrement(1);sound(PowerDevices.CLICK,.65f);sync();GridManager.refresh(p.getServer());if(!unstableFuse)message(p,"fuse_inserted");}
+   else if(!fuse&&(held.isOf(PowerDevices.FUSE)||held.isOf(PowerDevices.UNSTABLE_FUSE))){fuse=true;burnt=false;unstableFuse=held.isOf(PowerDevices.UNSTABLE_FUSE);var balance=dev.whiteout.power.lobby.Balance.get(world);nextFuseCheck=world.getTime()+(balance==null?UnstableFusePolicy.INTERVAL_TICKS:20*balance.fuseSeconds());if(!p.isCreative())held.decrement(1);sound(PowerDevices.CLICK,.65f);sync();GridManager.refresh(p.getServer());if(!unstableFuse)message(p,"fuse_inserted");}
    else if(fuse&&p.isSneaking()&&held.isEmpty()){ItemStack retrieved=new ItemStack(unstableFuse?PowerDevices.UNSTABLE_FUSE:PowerDevices.FUSE);fuse=false;unstableFuse=false;nextFuseCheck=0;setActive(false);give(p,retrieved);sound(PowerDevices.CLICK,.65f);sync();GridManager.refresh(p.getServer());}
    else message(p,burnt?"fuse_burnt":!fuse?"fuse_missing":active()?"panel_on":"panel_no_power");
    return;

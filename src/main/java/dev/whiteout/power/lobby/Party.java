@@ -21,7 +21,7 @@ import static net.minecraft.server.command.CommandManager.literal;
 public final class Party {
  private Party(){}
  public record Person(UUID id,String name){}
- public record Status(long revision,UUID host,UUID partner,UUID invited,boolean mine,boolean other,boolean canStart,List<Person> online,String dimension,double x,double y,double z,LobbyState.Start start,Balance balance){}
+ public record Status(long revision,boolean started,UUID host,UUID partner,UUID invited,boolean mine,boolean other,boolean canStart,List<Person> online,String dimension,double x,double y,double z,LobbyState.Start start,Balance balance){}
  public record Info(UUID token,String json) implements CustomPayload{
   public static final Id<Info> ID=new Id<>(PowerDevices.id("board_party"));
   public static final PacketCodec<RegistryByteBuf,Info> CODEC=PacketCodec.ofStatic((b,p)->{b.writeUuid(p.token);b.writeString(p.json,24000);},b->new Info(b.readUuid(),b.readString(24000)));
@@ -55,7 +55,7 @@ public final class Party {
   UUID a=d==null?null:d.first(),b=d==null?null:d.second(),id=p.getUuid();
   var list=s.getPlayerManager().getPlayerList().stream().limit(128).map(q->new Person(q.getUuid(),q.getGameProfile().getName())).toList();
   boolean start=d!=null&&!d.started()&&(a==null||id.equals(a))&&(b==null?v.invite==null:v.ready.containsAll(List.of(a,b))&&online(s,b)!=null);
-  var status=new Status(d==null?0:d.revision(),a,b,v.invite,v.ready.contains(id),v.ready.contains(id.equals(a)?b:a),start,list,p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ(),d==null?null:d.start(),Balance.get(Store.get(s).data));
+  var status=new Status(d==null?0:d.revision(),d!=null&&d.started(),a,b,v.invite,v.ready.contains(id),v.ready.contains(id.equals(a)?b:a),start,list,p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ(),d==null?null:d.start(),Balance.get(Store.get(s).data));
   ServerPlayNetworking.send(p,new Info(token,BoardNetwork.JSON.toJson(status)));
  }
  private static void require(boolean ok){if(!ok)throw new IllegalStateException("Action unavailable");}
@@ -103,7 +103,7 @@ public final class Party {
    require(id.equals(d.first())||d.first()==null&&!d.started()||id.equals(v.alone));
    var balance=m.value.startsWith("{")?BoardNetwork.JSON.fromJson(m.value,Balance.class):Balance.preset(m.value);
    if(m.value.startsWith("{"))require(balance.preset().equals("custom"));
-   var staged=d.change(d.first()==null?id:d.first(),d.second(),d.started(),d.photos(),d.start());
+   var staged=d.started()?d:d.change(d.first()==null?id:d.first(),d.second(),false,d.photos(),d.start());
    var access=(Balance.Access)(Object)store.data;var prior=access.whiteout$balance();access.whiteout$balance(balance);
    try{LobbyState.save(store,d,staged);}catch(Exception ex){access.whiteout$balance(prior);throw ex;}
    v.revision(staged.revision());dev.whiteout.net.WhiteoutNetwork.syncAll(s);

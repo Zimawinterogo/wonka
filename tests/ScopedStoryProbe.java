@@ -46,6 +46,12 @@ public class ScopedStoryProbe {
     "actions":[{"variable":"step","operation":"SET","value":{"type":"INT","integer":3}}]}
     """,StoryEventCatalog.Event.class);
    var pos=new ScopedStory.Position("minecraft:overworld",5,70,5,0,0);
+   var token=UUID.randomUUID();
+   var assembly=new dev.whiteout.power.lobby.PhotoTransfer.Assembly(token,7,2);
+   var pixels=new byte[dev.whiteout.power.lobby.PhotoTransfer.CHUNK];
+   try{assembly.add(new dev.whiteout.power.lobby.PhotoTransfer.Part(token,7,1,0,pixels));throw new AssertionError("mixed photo");}catch(IllegalArgumentException expected){}
+   for(int i=0;i<dev.whiteout.power.lobby.PhotoTransfer.COUNT;i++)
+    check(assembly.add(new dev.whiteout.power.lobby.PhotoTransfer.Part(token,7,2,i,pixels))==(i+1==dev.whiteout.power.lobby.PhotoTransfer.COUNT),"complete photo only");
    var before=Files.readString(path);
    Files.createDirectory(tmp);
    try{ScopedStory.apply(store,alice,event,pos);throw new AssertionError("failed save accepted");}catch(java.io.IOException expected){}
@@ -57,6 +63,19 @@ public class ScopedStoryProbe {
    check(own.storyVariables.get("step").integer==3&&own.checkpoints.containsKey("camp"),"personal state reaches owner");
    check(!other.storyVariables.containsKey("step")&&!other.checkpoints.containsKey("camp")&&!Store.GSON.toJson(other).contains(alice.toString()),"no other player state");
    check(!store.data.completedEvents.contains(event.key())&&ScopedStory.apply(store,bob,event,pos)==StoryCommitTransaction.Result.COMMITTED,"independent Once");
+   var duo=new dev.whiteout.power.lobby.LobbyState(card,alice,bob,true,3);
+   var fallback=new Narrative.Ending("default","Возвращение",1,List.of(),"exit",List.of(),null);
+   var spec=new SharedScene.Spec("last_train",200,"exit_scene",List.of());
+   var conditional=new Narrative.Ending("together","Поезд",2,List.of(new Narrative.Requirement(Narrative.Source.SECOND,List.of(),List.of(event.key()))),"exit",List.of(),spec);
+   check(Narrative.chooseEnding(store,duo,List.of(fallback,conditional))==conditional,"second player's private progress selects priority ending");
+   check(Narrative.chooseEnding(store,new dev.whiteout.power.lobby.LobbyState(card,alice,null,true,3),List.of(fallback,conditional))==fallback,"Solo cannot borrow a missing role");
+   var scene=(SharedScene.Access)(Object)store.data;scene.whiteout$scene(new SharedScene.Playing(token,spec,98));
+   var grants=((SceneDelivery.Access)(Object)store.data).whiteout$grants();grants.add(new SceneDelivery.Grant(bob,"whiteout.grant."+token,new SceneDelivery.Action(Narrative.Role.SECOND,"minecraft:paper",1,null)));
+   store.save();store=StoryStoreReader.open(path);
+   check(store.error==null&&((SharedScene.Access)(Object)store.data).whiteout$scene().elapsed()==98,"scene cursor survives restart");
+   check(((SceneDelivery.Access)(Object)store.data).whiteout$grants().size()==1,"pending reward survives restart");
+   var filtered=ScopedStory.snapshot(store,alice);
+   check(((SceneDelivery.Access)(Object)filtered).whiteout$grants().isEmpty()&&((SharedScene.Access)(Object)filtered).whiteout$scene()==null,"private finale and receipts are filtered");
    var view=ScopedStory.checkpointView(store,alice,"camp");
    check(view.checkpoints.get("camp").completedEvents.contains(event.key()),"checkpoint captured after Once");
    CheckpointRules.restore(view,view.checkpoints.get("camp"));ScopedStory.persistCheckpoint(store,alice,view);

@@ -88,6 +88,12 @@ public final class StoryEventCatalog {
    for(var entry:root.getAsJsonArray("events")){
     var object=entry.getAsJsonObject();
     if(object.has("narrative")&&root.get("schema").getAsInt()!=4)throw new IllegalArgumentException("narrative requires schema 4");
+    if(object.has("narrative")){var policy=object.getAsJsonObject("narrative");
+     if(policy.has("mode"))Narrative.Mode.valueOf(policy.get("mode").getAsString());
+     if(policy.has("actor"))Narrative.Role.valueOf(policy.get("actor").getAsString());
+     if(policy.has("recipient"))Narrative.Role.valueOf(policy.get("recipient").getAsString());
+     if(policy.has("visibility"))Narrative.Visibility.valueOf(policy.get("visibility").getAsString());
+    }
     if(object.has("scope")||object.has("checkpoint")){
      if(root.get("schema").getAsInt()<3&&(object.has("checkpoint")||!"WORLD".equals(object.get("scope").getAsString())))throw new IllegalArgumentException("scoped progress requires schema 3");
      if(object.has("scope"))ScopedStory.Scope.valueOf(object.get("scope").getAsString());
@@ -104,11 +110,17 @@ public final class StoryEventCatalog {
      rules.put(event.key(),new TriggerEvidence.Rule(event.key(),event.area(),event.trigger()));
     }
    }
+   for(Event entry:data.events()){var policy=entry.narrative();if(policy==null)continue;
+    if(policy.sharedScene()!=null)requireExit(policy.sharedScene().completion());
+    for(var ending:policy.endings()){var target=requireExit(ending.event());if(target.world()!=null)throw new IllegalArgumentException("world conditions belong on ending entrance");
+     if(ending.finale()!=null){if(ending.finale().completion().equals(target.key()))throw new IllegalArgumentException("finale requires a separate completion");requireExit(ending.finale().completion());}}
+   }
    for(var rule:rules.values())for(String next:rule.binding().nextChoices()){
     if(!rules.containsKey(next)||rules.get(next).binding().type()!=TriggerEvidence.Kind.CHOICE)throw new IllegalArgumentException("unknown choice: "+next);
    }
   }catch(Exception failure){events.clear();rules.clear();boundEvents.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
  }
+ private Event requireExit(String key){var target=find(key);if(target==null||!target.serverOnly()||!target.once()||target.scope()!=ScopedStory.Scope.WORLD||target.narrative()!=null)throw new IllegalArgumentException("missing canonical WORLD Once event: "+key);return target;}
  public boolean invalid(){return !error.isEmpty();}
  public String error(){return error;}
  public int size(){return events.size();}

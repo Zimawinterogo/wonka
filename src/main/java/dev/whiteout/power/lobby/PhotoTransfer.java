@@ -27,10 +27,10 @@ public final class PhotoTransfer{
   public Id<? extends CustomPayload> getId(){return ID;}
  }
  public static final class Assembly{
-  final UUID token;final long revision;final byte[] bytes=new byte[BYTES];int next;
-  public Assembly(UUID token,long revision){this.token=token;this.revision=revision;}
+  final UUID token;final long revision;final int index;final byte[] bytes=new byte[BYTES];int next;
+  public Assembly(UUID token,long revision,int index){this.index=index;this.token=token;this.revision=revision;}
   public boolean add(Part p){
-   if(!token.equals(p.token)||revision!=p.revision||next>=COUNT||p.part!=next||p.data.length!=CHUNK)throw new IllegalArgumentException("invalid photo part");
+   if(!token.equals(p.token)||revision!=p.revision||index!=p.index||next>=COUNT||p.part!=next||p.data.length!=CHUNK)throw new IllegalArgumentException("invalid photo part");
    System.arraycopy(p.data,0,bytes,next++*CHUNK,CHUNK);return next==COUNT;
   }
  }
@@ -43,10 +43,10 @@ public final class PhotoTransfer{
  public static String hash(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception ex){throw new IllegalStateException(ex);}}
  static List<LobbyState.Photo> pictures(BoardNetwork.View v){return List.of(BoardNetwork.JSON.fromJson(v.details(),LobbyState.Photo[].class));}
  private static void receive(ServerPlayerEntity p,Part msg){
-  if(!BoardNetwork.access(p,msg.token,true)||msg.index!=-1)return;
+  if(!BoardNetwork.access(p,msg.token,true)||msg.index< -1)return;
   var store=Store.get(p.getServer());var state=LobbyState.get(store);
-  if(state==null||state.started()||state.revision()!=msg.revision||state.photos().size()>=5)return;
-  if(msg.part==0){if(!budget(p))return;uploads.put(p,new Assembly(msg.token,msg.revision));}
+  if(state==null||state.started()||state.revision()!=msg.revision||msg.index>=state.photos().size()||msg.index==-1&&state.photos().size()>=5)return;
+  if(msg.part==0){if(!budget(p))return;uploads.put(p,new Assembly(msg.token,msg.revision,msg.index));}
   var pending=uploads.get(p);if(pending==null)return;
   try{if(!pending.add(msg))return;}catch(IllegalArgumentException ex){uploads.remove(p);return;}
   uploads.remove(p);var folder=folder(p);var server=p.getServer();var bytes=pending.bytes;
@@ -58,7 +58,7 @@ public final class PhotoTransfer{
    }
    server.execute(()->{
     if(!BoardNetwork.access(p,msg.token,true))return;
-    try{var photos=new ArrayList<>(state.photos());photos.add(new LobbyState.Photo(hash,0,0,0));LobbyState.photos(store,msg.revision,photos);}
+    try{var photos=new ArrayList<>(state.photos());if(msg.index==-1)photos.add(new LobbyState.Photo(hash,0,0,0));else {var old=photos.get(msg.index);photos.set(msg.index,new LobbyState.Photo(hash,old.x(),old.y(),old.angle()));}LobbyState.photos(store,msg.revision,photos);}
     catch(Exception ex){denied(p);}BoardNetwork.refresh(p);
    });
   },p);

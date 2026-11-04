@@ -20,13 +20,17 @@ public final class SceneDelivery{
  }
  public record Grant(UUID player,String receipt,Action action){}
  public static final class Ledger extends ArrayList<Grant>{}
+ public static void validate(Ledger ledger){
+  if(ledger==null||ledger.size()>256)throw new IllegalArgumentException("delivery ledger");
+  var receipts=new HashSet<String>();for(var g:ledger)if(g==null||g.player==null||g.action==null||g.receipt==null||!g.receipt.matches("whiteout\\.grant\\.[0-9a-f-]{36}")||!receipts.add(g.receipt))throw new IllegalArgumentException("invalid delivery receipt");
+ }
  public interface Access{Ledger whiteout$grants();void whiteout$grants(Ledger ledger);}
  static Ledger prepare(MinecraftServer s,Store store,String key,List<Action> actions){
   var access=(Access)(Object)store.data;var result=new Ledger();result.addAll(access.whiteout$grants());
   var d=LobbyState.get(store);if(actions.isEmpty())return result;
   if(d==null||!d.started()||actions.size()>8)throw new IllegalArgumentException("scene participants");
   for(int i=0;i<actions.size();i++){
-   var action=actions.get(i);if(action.item!=null){var item=Registries.ITEM.getOrEmpty(Identifier.of(action.item)).orElseThrow();if(item.getDefaultStack().isEmpty()||item.getMaxCount()<action.count)throw new IllegalArgumentException("item/count");}
+   var action=actions.get(i);if(action.item!=null){var item=Registries.ITEM.getOrEmpty(Identifier.of(action.item)).orElseThrow();if(item.getDefaultStack().isEmpty()||item.getDefaultStack().getMaxCount()<action.count)throw new IllegalArgumentException("item/count");}
    if(action.move!=null){var m=action.move;var world=s.getWorld(RegistryKey.of(RegistryKeys.WORLD,Identifier.of(m.dimension)));var pos=BlockPos.ofFloored(m.x,m.y,m.z);if(world==null||world.isOutOfHeightLimit(pos)||!world.getWorldBorder().contains(pos))throw new IllegalArgumentException("destination");}
    for(var who:new UUID[]{d.first(),d.second()}){if(who==null||action.recipient==Narrative.Role.FIRST&&!who.equals(d.first())||action.recipient==Narrative.Role.SECOND&&!who.equals(d.second()))continue;
     String receipt="whiteout.grant."+UUID.nameUUIDFromBytes((key+"/"+i+"/"+who).getBytes(java.nio.charset.StandardCharsets.UTF_8));

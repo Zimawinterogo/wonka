@@ -18,7 +18,7 @@ public abstract class StoryStoreMixin {
   return path;
  }
  @Inject(method="validateData",at=@At("RETURN"))
- private void whiteout$validatePlayers(CallbackInfo ci){ScopedStory.validate(data);}
+ private void whiteout$validatePlayers(CallbackInfo ci){ScopedStory.validate(data);dev.whiteout.power.SceneDelivery.validate(((dev.whiteout.power.SceneDelivery.Access)(Object)data).whiteout$grants());}
  @Inject(method="networkSnapshot",at=@At("RETURN"))
  private void whiteout$privateProgress(CallbackInfoReturnable<Store.Data> ci){
   ((ScopedStory.Players)(Object)ci.getReturnValue()).whiteout$players().clear();

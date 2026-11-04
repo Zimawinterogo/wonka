@@ -21,7 +21,7 @@ final class PhotoScreen extends SharpScreen{
  private static final Map<String,Identifier> cache=new LinkedHashMap<>();
  private static final Map<Integer,Assembly> incoming=new HashMap<>();
  private static BoardNetwork.View current;
- private final BoardNetwork.View data;private final boolean editor;private int index;
+ private final BoardNetwork.View data;private final boolean editor;private int index,uploadIndex=-1;
  private BufferedImage source;private byte[] draft;private Identifier preview;private double cropX=.5,cropY=.5,zoom=1;
  private int x,y,angle;private boolean choosing;
  private String status="";
@@ -30,7 +30,7 @@ final class PhotoScreen extends SharpScreen{
   ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->client.execute(()->{clear(client);current=null;}));
   ClientPlayNetworking.registerGlobalReceiver(Part.ID,(p,c)->c.client().execute(()->{
    if(current==null||!current.token().equals(p.token())||p.index()<0||p.index()>=pictures(current).size())return;
-   if(p.part()==0)incoming.put(p.index(),new Assembly(p.token(),p.revision()));
+   if(p.part()==0)incoming.put(p.index(),new Assembly(p.token(),p.revision(),p.index()));
    var a=incoming.get(p.index());if(a==null)return;
    try{if(a.add(p)){incoming.remove(p.index());var hash=pictures(current).get(p.index()).hash();if(hash(a.bytes).equals(hash))cache.put(hash,texture(c.client(),hash,a.bytes));}}catch(RuntimeException ex){incoming.remove(p.index());}
   }));
@@ -82,12 +82,12 @@ final class PhotoScreen extends SharpScreen{
   int cx=width/2,b=height-46;var pics=pictures(data);
   if(source!=null){
    button("−",cx-118,b,24,()->{zoom=Math.max(1,zoom-.25);crop();});button("+",cx-91,b,24,()->{zoom=Math.min(4,zoom+.25);crop();});
-   button("Сохранить снимок",cx-60,b,122,()->{for(int i=0;i<COUNT;i++)ClientPlayNetworking.send(new Part(data.token(),data.revision(),-1,i,Arrays.copyOfRange(draft,i*CHUNK,(i+1)*CHUNK)));source=null;status="Отправлено";clearAndInit();});return;
+   button("Сохранить снимок",cx-60,b,122,()->{for(int i=0;i<COUNT;i++)ClientPlayNetworking.send(new Part(data.token(),data.revision(),uploadIndex,i,Arrays.copyOfRange(draft,i*CHUNK,(i+1)*CHUNK)));source=null;status="Отправлено";clearAndInit();});return;
   }
-  if(editor&&pics.size()<5)button("+ Фото",cx-140,b,62,this::choose);
+  if(editor&&pics.size()<5)button("+ Фото",cx-140,b,62,()->{uploadIndex=-1;choose();});
   if(!pics.isEmpty()){
    button("‹",cx-72,b,24,()->{select(index-1);clearAndInit();});button("›",cx-46,b,24,()->{select(index+1);clearAndInit();});
-   if(editor){button("Главное",cx-18,b,60,()->edit("main"));button("Раньше",cx+44,b,54,()->edit("earlier"));button("×",cx+100,b,26,()->edit("delete"));button("Сохранить положение",cx-70,b+21,140,()->edit("layout"));}
+   if(editor){button("Главное",cx-18,b,60,()->edit("main"));button("Раньше",cx+44,b,54,()->edit("earlier"));button("×",cx+100,b,26,()->edit("delete"));button("Заменить фото",cx-135,b+21,108,()->{uploadIndex=index;choose();});button("Сохранить положение",cx-24,b+21,140,()->edit("layout"));}
   }
  }
  @Override public boolean mouseDragged(double mx,double my,int btn,double dx,double dy){

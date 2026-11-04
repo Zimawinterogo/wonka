@@ -32,12 +32,21 @@ final class AuthorScreen extends SharpScreen{
    body.setText(new GsonBuilder().setPrettyPrinting().create().toJson(event));
   }catch(RuntimeException ex){message="Исправьте JSON перед применением шаблона";}
  }
+ private void cycle(String field,String... values){
+  try{var event=JsonParser.parseString(body.getText()).getAsJsonObject();var policy=event.getAsJsonObject("narrative");var options=java.util.List.of(values);
+   String selected=options.get((options.indexOf(policy.has(field)?policy.get(field).getAsString():"")+1)%options.size());policy.addProperty(field,selected);
+   if(field.equals("visibility")){boolean shared=selected.equals("SHARED");event.addProperty("scope",shared?"WORLD":"PLAYER");if(!shared&&policy.get("recipient").getAsString().equals("ANY"))policy.addProperty("recipient","SECOND");}
+   if(policy.get("visibility").getAsString().equals("SECRET")){if(field.equals("actor"))policy.addProperty("recipient",selected);else policy.addProperty("actor",policy.get("recipient").getAsString());}
+   body.setText(new GsonBuilder().setPrettyPrinting().create().toJson(event));message=field+" = "+selected;
+  }catch(RuntimeException ex){message="Выберите шаблон или загрузите событие с настройками ролей";}
+ }
  @Override protected void init(){
   int x=10,w=width-20;key=addDrawableChild(new TextFieldWidget(textRenderer,x,22,w-99,19,Text.literal("ID события")));key.setMaxLength(128);
   btn(x+w-95,22,23,"›",()->{if(keys.length>0)key.setText(keys[++page%keys.length]);});btn(x+w-70,22,70,"Загрузить",()->send(key.getText(),""));
-  body=addDrawableChild(new EditBoxWidget(textRenderer,x,46,w,height-111,Text.literal("Определение события JSON"),Text.literal("Событие")));body.setMaxLength(16000);
-  int y=height-61;btn(x,y,66,"Общее",()->preset(false,false));btn(x+69,y,70,"Секретное",()->preset(true,false));btn(x+142,y,61,"Финал",()->preset(false,true));
-  btn(x+w-84,height-25,84,"Сохранить",()->send(key.getText(),body.getText()));send("","");
+  body=addDrawableChild(new EditBoxWidget(textRenderer,x,46,w,height-117,Text.literal("Определение события JSON"),Text.literal("Событие")));body.setMaxLength(16000);
+  int y=height-66;btn(x,y,66,"Общее",()->preset(false,false));btn(x+69,y,70,"Секретное",()->preset(true,false));btn(x+142,y,61,"Финал",()->preset(false,true));
+  btn(x,y+20,63,"Режим",()->cycle("mode","BOTH","SOLO","DUO"));btn(x+65,y+20,60,"Автор",()->cycle("actor","ANY","FIRST","SECOND"));btn(x+127,y+20,81,"Получатель",()->cycle("recipient","ANY","FIRST","SECOND"));btn(x+210,y+20,80,"Видимость",()->cycle("visibility","SHARED","PERSONAL","SECRET"));
+  btn(x+w-84,height-20,84,"Сохранить",()->send(key.getText(),body.getText()));send("","");
  }
  @Override public void render(DrawContext d,int mx,int my,float dt){d.fill(0,0,width,height,0xff30271e);d.drawTextWithShadow(textRenderer,"События · задания · сюжетные ветки",10,7,0xffe4d4af);d.drawTextWithShadow(textRenderer,textRenderer.trimToWidth(message,width-120),10,height-19,0xffe4d4af);super.render(d,mx,my,dt);}
  @Override public void close(){client.setScreen(new BoardScreen(board));}

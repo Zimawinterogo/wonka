@@ -45,7 +45,7 @@ final class PartyScreen extends SharpScreen{
    btn(x,y+141,138,"К нормальной",()->request("difficulty","normal"));
    btn(x+144,y+141,138,"Сохранить",()->{try{int[] n=Arrays.stream(fields).mapToInt(t->Integer.parseInt(t.getText())).toArray();request("difficulty",BoardNetwork.JSON.toJson(new Balance("custom",n[0],n[1],n[2],n[3],n[4],n[5],n[6],n[7],n[8])));}catch(RuntimeException ex){error="Проверьте диапазоны";}});return;
   }
-  if(!view.started()){
+  if(!state.started()){
    if(me.equals(state.invited())){btn(x,y+43,134,"Принять приглашение",()->request("accept",""));btn(x+142,y+43,134,"Отклонить",()->request("decline",""));return;}
    if(state.partner()!=null){if(me.equals(state.host())||me.equals(state.partner())){
     btn(x,y+48,134,state.mine()?"Снять готовность":"Я готов",()->request("ready",""));btn(x+142,y+48,134,"Покинуть Duo",()->request("solo",""));}return;}
