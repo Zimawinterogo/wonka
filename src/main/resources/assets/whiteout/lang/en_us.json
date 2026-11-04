@@ -1,4 +1,5 @@
 {
+  "board.whiteout.reset": "Board start unlocked. Existing story progress was preserved.",
   "block.whiteout.story_board": "Story Board",
   "board.whiteout.board": "Story board",
   "board.whiteout.edit": "Edit story",

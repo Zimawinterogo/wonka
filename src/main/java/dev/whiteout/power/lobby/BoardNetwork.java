@@ -50,6 +50,16 @@ public final class BoardNetwork{
   return false;
  }
  public static void register(){
+  net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher,registry,environment)->dispatcher.register(
+   net.minecraft.server.command.CommandManager.literal("whiteout").then(net.minecraft.server.command.CommandManager.literal("lobby")
+   .then(net.minecraft.server.command.CommandManager.literal("reset-launch").requires(s->s.getEntity() instanceof ServerPlayerEntity p&&p.isCreative()&&s.hasPermissionLevel(2))
+   .then(net.minecraft.server.command.CommandManager.literal("confirm").executes(c->{
+    var server=c.getSource().getServer();
+    try{LobbyState.resetLaunch(Store.get(server));}
+    catch(java.io.IOException|IllegalStateException failure){c.getSource().sendError(Text.translatable("story.whiteout.request_denied"));return 0;}
+    dev.whiteout.net.WhiteoutNetwork.syncAll(server);
+    c.getSource().sendFeedback(()->Text.translatable("board.whiteout.reset"),true);return 1;
+   }))))));
   PayloadTypeRegistry.playS2C().register(View.ID,View.CODEC);PayloadTypeRegistry.playC2S().register(Change.ID,Change.CODEC);
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->sessions.remove(h.getPlayer()));
   ServerPlayNetworking.registerGlobalReceiver(Change.ID,(msg,ctx)->ctx.server().execute(()->{

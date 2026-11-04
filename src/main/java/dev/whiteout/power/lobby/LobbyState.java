@@ -32,6 +32,10 @@ public record LobbyState(Card card,UUID first,UUID second,boolean started,long r
   if(old==null||old.mode()!=Mode.SOLO||old.first!=null&&!old.first.equals(host))throw new IllegalStateException("unavailable");
   save(store,old,new LobbyState(old.card,Objects.requireNonNull(host),null,true,Math.incrementExact(revision)));
  }
+ public static void resetLaunch(Store store)throws java.io.IOException{
+  var old=get(store);if(old==null||!old.started)throw new IllegalStateException("not started");
+  save(store,old,new LobbyState(old.card,null,null,false,Math.incrementExact(old.revision)));
+ }
  public static final String STARTED="whiteout:lobby_started";
  private static void check(LobbyState old,long revision){
   if(old==null?revision!=0:old.revision!=revision||old.started)throw new IllegalStateException("stale or started");
@@ -39,9 +43,11 @@ public record LobbyState(Card card,UUID first,UUID second,boolean started,long r
  private static void save(Store store,LobbyState old,LobbyState value)throws java.io.IOException{
   if(store.error!=null)throw new java.io.IOException(store.error);
   var access=(Access)(Object)store.data;access.whiteout$lobby(value);
-  boolean marker=value.started&&store.data.completedEvents.add(STARTED);
+  boolean hadMarker=store.data.completedEvents.contains(STARTED);
+  if(value.started)store.data.completedEvents.add(STARTED);
+  else if(old!=null&&old.started)store.data.completedEvents.remove(STARTED);
   try{store.save();}catch(java.io.IOException|RuntimeException ex){
-   access.whiteout$lobby(old);if(marker)store.data.completedEvents.remove(STARTED);throw ex;
+   access.whiteout$lobby(old);if(hadMarker)store.data.completedEvents.add(STARTED);else store.data.completedEvents.remove(STARTED);throw ex;
   }
  }
 }

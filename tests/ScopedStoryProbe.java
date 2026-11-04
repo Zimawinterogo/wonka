@@ -33,6 +33,10 @@ public class ScopedStoryProbe {
    dev.whiteout.power.lobby.LobbyState.startSolo(store,1,alice);store=StoryStoreReader.open(path);
    check(dev.whiteout.power.lobby.LobbyState.get(store).first().equals(alice)&&store.data.completedEvents.contains(dev.whiteout.power.lobby.LobbyState.STARTED),"persisted start and host");
    try{dev.whiteout.power.lobby.LobbyState.startSolo(store,2,bob);throw new AssertionError("duplicate start");}catch(IllegalStateException expected){}
+   store.data.completedEvents.add("existing:story");
+   dev.whiteout.power.lobby.LobbyState.resetLaunch(store);store=StoryStoreReader.open(path);
+   check(!dev.whiteout.power.lobby.LobbyState.get(store).started()&&dev.whiteout.power.lobby.LobbyState.get(store).card().equals(card)
+    &&store.data.completedEvents.contains("existing:story")&&!store.data.completedEvents.contains(dev.whiteout.power.lobby.LobbyState.STARTED),"unlock board only");
    var legacy=com.google.gson.JsonParser.parseString(Files.readString(path)).getAsJsonObject();
    legacy.remove("playerStory");legacy.remove("storyLobby");Files.writeString(path,legacy.toString());
    store=StoryStoreReader.open(path);check(store.error==null,"legacy file loaded");
