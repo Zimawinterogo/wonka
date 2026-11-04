@@ -46,9 +46,11 @@ def boot(first):
         wait('For help, type "help"', 180)
         command("forceload add 0 0")
         if first:
+            command("tick freeze")
             command("fill 3 100 4 4 101 4 minecraft:stone")
             for i in range(4):
                 command(f"setblock {4-i%2} {100+i//2} 3 whiteout:story_board[facing=north,part={i}]")
+            command("tick unfreeze")
         for i in range(4):
             marker = f"BOARD_CELL_{i}_PRESENT"
             command(f"execute if block {4-i%2} {100+i//2} 3 whiteout:story_board[part={i}] run say {marker}")

@@ -13,6 +13,8 @@ public class DialogueRouteClientProbe {
   var script=new DialogueManager.Script("legacy",List.of("old_alias"),List.of(),List.of());registry.put(script.id(),script);
   if(DialogueManager.findById("legacy")!=script||DialogueManager.findById("LEGACY")!=script||!script.aliases().equals(List.of("old_alias")))throw new AssertionError("existing script metadata/lookup changed");
   registry.remove(script.id());
+  var director=dev.whiteout.client.director.DirectorPlayer.class;
+  if(Arrays.stream(director.getDeclaredMethods()).noneMatch(m->m.getName().contains("whiteout$pause"))||Arrays.stream(director.getDeclaredMethods()).noneMatch(m->m.getName().contains("whiteout$vote")))throw new AssertionError("shared scene control mixins absent");
   var runtime=dev.whiteout.client.StoryRuntime.class;
   if(Arrays.stream(runtime.getDeclaredMethods()).noneMatch(m->m.getName().contains("authorizedFire")))throw new AssertionError("StoryRuntime authority Mixin absent");
   if(Arrays.stream(dev.whiteout.client.director.DirectorTriggerManager.class.getDeclaredMethods()).noneMatch(m->m.getName().contains("serverManaged")))throw new AssertionError("Migrated trigger guard absent");
