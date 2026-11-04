@@ -127,18 +127,15 @@ public final class BoardScreen extends SharpScreen {
    LobbyUi.caption(d,textRenderer,"СЮЖЕТНАЯ КАМПАНИЯ",x+29,y+54,lw-48,LobbyUi.INK_SOFT);
    LobbyUi.fit(d,textRenderer,data.card().title(),x+25,y+73,lw-39,LobbyUi.INK,false,0);
    LobbyUi.divider(d,x+25,y+90,lw-39);
-   int px=x+26,py=y+99,pw=Math.min(wide?150:lw-47,lw-47),ph=wide&&roomy?84:49;
-   if(!PhotoTransfer.pictures(data).isEmpty()){
-    PhotoScreen.collage(d,data,px+pw/2,py+ph/2);
-   }else{
-    d.drawTexture(LobbyUi.SCENE,px,py,0,0,pw,ph,160,90);
-    d.drawBorder(px-1,py-1,pw+2,ph+2,0xff6c8792);
-    d.fill(px,py+ph-10,px+pw,py+ph,0x8c0b1d26);
-   }
+   int px=x+26,py=y+99,pw=Math.min(wide?150:lw-47,lw-47),ph=wide&&roomy?84:28;
+   d.drawTexture(LobbyUi.SCENE,px,py,0,0,pw,ph,160,90);
+   d.drawBorder(px-1,py-1,pw+2,ph+2,0xff6c8792);
+   if(!PhotoTransfer.pictures(data).isEmpty())PhotoScreen.collage(d,data,px+pw/2,py+ph/2);
+   else d.fill(px,py+ph-10,px+pw,py+ph,0x8c0b1d26);
    int descX=wide&&roomy?px+pw+12:x+25;
    int descY=wide&&roomy?py+9:py+ph+8;
    int descW=wide&&roomy?lw-pw-57:lw-46;
-   int maxY=y+h-73;
+   int maxY=y+h-(roomy?97:73);
    if(!PhotoTransfer.pictures(data).isEmpty()&&wide&&roomy){
     LobbyUi.fit(d,textRenderer,"ФОТОГРАФИИ",px,y+190,pw,LobbyUi.LIGHT_DIM,false,0);
    }
