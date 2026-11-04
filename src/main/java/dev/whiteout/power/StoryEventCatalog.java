@@ -77,6 +77,7 @@ public final class StoryEventCatalog {
    &&StoryWorldConditions.evaluate(event.world(),world)==WinterCrisisConditions.Truth.TRUE;
  }
  public Collection<TriggerEvidence.Rule> rules(){return Collections.unmodifiableCollection(rules.values());}
+ Event bound(String key){return boundEvents.get(key);}
  public TriggerEvidence.Rule rule(String key){return rules.get(key);}
  boolean visible(ServerPlayerEntity player,String key){var e=boundEvents.get(key);return e!=null&&(e.narrative()==null||Narrative.allowed(player,e));}
  private String error="";

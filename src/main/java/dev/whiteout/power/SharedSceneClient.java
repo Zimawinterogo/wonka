@@ -15,16 +15,16 @@ public final class SharedSceneClient{
  }
  static void clear(){run=null;scene=null;paused=false;}
  static boolean control(DialogueBarrier.Cue cue){
-  if(cue.kind().equals("scene")){
-   String[] values=cue.value().split(" ",2);if(values.length!=2)return true;var asset=DirectorLibrary.get(values[0]);
-   if(asset==null){Bridge.message("Отсутствует сцена: "+values[0]);return true;}
+  if(cue.kind().equals("scene")){try{
+   String[] values=cue.value().split(" ",2);if(values.length!=2)throw new IllegalArgumentException();var asset=DirectorLibrary.get(values[0]);
+   if(asset==null)throw new IllegalArgumentException();
    // Gameplay effects are committed by the server completion event. The local track supplies camera and dialogue.
    var visual=dev.whiteout.Store.GSON.fromJson(dev.whiteout.Store.GSON.toJson(asset),DirectorScene.class);
    visual.events.removeIf(ev->ev.type!=DirectorScene.EventType.MESSAGE&&ev.type!=DirectorScene.EventType.DIALOGUE&&ev.type!=DirectorScene.EventType.RADIO);
    int elapsed=Integer.parseInt(values[1]);visual.events.removeIf(ev->elapsed>0&&ev.tick<=elapsed);
-   if(!DirectorPlayer.play(visual))return true;run=cue.id();scene=asset.id;paused=true;
+   if(!DirectorPlayer.play(visual))throw new IllegalArgumentException();run=cue.id();scene=asset.id;paused=true;
    SharedDirectorAccess.whiteout$seek(Math.min(elapsed,visual.durationTicks));ClientPlayNetworking.send(new DialogueBarrier.Cue(run,"loaded",""));return true;
-  }
+  }catch(RuntimeException ex){ClientPlayNetworking.send(new DialogueBarrier.Cue(cue.id(),"load_error",""));Bridge.message("Не удалось загрузить камеру Director");return true;}}
   if(cue.kind().equals("pause")){if(cue.id().equals(run))paused=cue.value().equals("1");return true;}
   if(cue.kind().equals("finish")){if(cue.id().equals(run)){boolean stop=owns();clear();if(stop)DirectorPlayer.stop(false);}return true;}
   return false;

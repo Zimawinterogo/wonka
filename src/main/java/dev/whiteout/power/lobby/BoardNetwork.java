@@ -45,7 +45,7 @@ public final class BoardNetwork{
   ServerPlayNetworking.send(p,new View(session.token,state==null?0:state.revision(),p.isCreative()&&p.hasPermissionLevel(2),state!=null&&state.started(),state==null?null:state.card(),JSON.toJson(state==null?List.of():state.photos())));
  }
  static boolean access(ServerPlayerEntity p,UUID token,boolean editor){
-  var s=sessions.get(p);return s!=null&&s.token.equals(token)&&valid(p,s)&&(!editor||p.isCreative()&&p.hasPermissionLevel(2));
+  var s=sessions.get(p);return s!=null&&s.token.equals(token)&&valid(p,s)&&(!editor||dev.whiteout.power.DuoTestMode.active(p)==null&&p.isCreative()&&p.hasPermissionLevel(2));
  }
  static void refresh(ServerPlayerEntity p){var s=sessions.get(p);if(valid(p,s))open(p,s.root);}
  static void notifyParty(net.minecraft.server.MinecraftServer server){sessions.forEach((p,s)->{if(p.getServer()==server&&valid(p,s))Party.send(p,s.token);});}
@@ -77,8 +77,8 @@ public final class BoardNetwork{
    if(!valid(p,session))return;
    var store=Store.get(ctx.server());
    try{
-    if(msg.card!=null){if(!p.isCreative()||!p.hasPermissionLevel(2))return;LobbyState.edit(store,msg.revision,msg.card);}
-    else Party.launch(p,msg.revision);
+    if(msg.card!=null){if(dev.whiteout.power.DuoTestMode.active(p)!=null||!p.isCreative()||!p.hasPermissionLevel(2))return;LobbyState.edit(store,msg.revision,msg.card);}
+    else if(dev.whiteout.power.DuoTestMode.active(p)!=null)dev.whiteout.power.DuoTestMode.active(p).launch();else Party.launch(p,msg.revision);
    }catch(Exception failure){p.sendMessage(Text.translatable("story.whiteout.request_denied"));}
    open(p,session.root);notifyParty(ctx.server());
    if(msg.card==null)dev.whiteout.net.WhiteoutNetwork.syncAll(ctx.server());

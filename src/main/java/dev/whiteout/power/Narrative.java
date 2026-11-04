@@ -70,9 +70,12 @@ public final class Narrative{
   return options.stream().filter(end->matches(store,d,end.when)).max(Comparator.comparingInt(Ending::priority)).orElseThrow(()->new IllegalStateException("no eligible ending"));
  }
  static StoryCommitTransaction.Result commit(ServerPlayerEntity p,StoryEventCatalog.Event e,ScopedStory.Position pos)throws Exception{
-  var store=Store.get(p.getServer());var n=e.narrative();var d=LobbyState.get(store);
+  return commit(p,Store.get(p.getServer()),owner(p,e),e,pos);
+ }
+ static StoryCommitTransaction.Result commit(ServerPlayerEntity p,Store store,UUID owner,StoryEventCatalog.Event e,ScopedStory.Position pos)throws Exception{
+  var n=e.narrative();var d=LobbyState.get(store);
   if(n!=null&&n.sharedScene()!=null)return SharedScene.begin(p,store,e,pos);
-  if(n==null||n.endings.isEmpty())return ScopedStory.apply(store,owner(p,e),e,pos);
+  if(n==null||n.endings.isEmpty())return ScopedStory.apply(store,owner,e,pos);
   var ending=chooseEnding(store,d,n.endings);
   var finalEvent=StoryAuthority.definition(p.getServer(),ending.event);
   if(!finalEvent.serverOnly()||!finalEvent.once()||finalEvent.scope()!=ScopedStory.Scope.WORLD||finalEvent.narrative()!=null||finalEvent.world()!=null||

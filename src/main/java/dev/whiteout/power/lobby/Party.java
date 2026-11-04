@@ -55,6 +55,7 @@ public final class Party {
   UUID a=d==null?null:d.first(),b=d==null?null:d.second(),id=p.getUuid();
   var list=s.getPlayerManager().getPlayerList().stream().limit(128).map(q->new Person(q.getUuid(),q.getGameProfile().getName())).toList();
   boolean start=d!=null&&!d.started()&&(a==null||id.equals(a))&&(b==null?v.invite==null:v.ready.containsAll(List.of(a,b))&&online(s,b)!=null);
+  var test=DuoTestMode.active(p);if(test!=null){ServerPlayNetworking.send(p,new Info(token,BoardNetwork.JSON.toJson(test.statusView(p,d))));return;}
   var status=new Status(d==null?0:d.revision(),d!=null&&d.started(),a,b,v.invite,v.ready.contains(id),v.ready.contains(id.equals(a)?b:a),start,list,p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ(),d==null||!p.isCreative()||!p.hasPermissionLevel(2)?null:d.start(),Balance.get(Store.get(s).data));
   ServerPlayNetworking.send(p,new Info(token,BoardNetwork.JSON.toJson(status)));
  }
@@ -97,6 +98,7 @@ public final class Party {
   v.ready.clear();v.alone=null;
  }
  private static void request(ServerPlayerEntity p,Request m)throws Exception{
+  if(DuoTestMode.active(p)!=null){p.sendMessage(Text.literal("Используйте /whiteout test-duo ready или launch"));return;}
   boolean config=m.op.equals("start-config");require(BoardNetwork.access(p,m.token,config));
   var s=p.getServer();var store=Store.get(s);var d=LobbyState.get(store);require(d!=null&&d.revision()==m.revision&&store.error==null);
   var v=session(s,d);var id=p.getUuid();

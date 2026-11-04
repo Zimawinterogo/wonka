@@ -72,7 +72,10 @@ public final class PhotoTransfer{
  private static void denied(ServerPlayerEntity p){p.sendMessage(net.minecraft.text.Text.translatable("story.whiteout.request_denied"));}
  private interface Task{void run()throws Exception;}
  private static void async(Task task,ServerPlayerEntity p){
-  var server=p.getServer();try{IO.execute(()->{try{task.run();}catch(Exception ex){server.execute(()->denied(p));}});}catch(RejectedExecutionException ex){denied(p);}
+  async(task,p,()->{});
+ }
+ private static void async(Task task,ServerPlayerEntity p,Runnable rejected){
+  var server=p.getServer();try{IO.execute(()->{try{task.run();}catch(Exception ex){server.execute(()->denied(p));}});}catch(RejectedExecutionException ex){rejected.run();denied(p);}
  }
  private static void edit(ServerPlayerEntity p,Edit m){
   boolean get="get".equals(m.op);if(!BoardNetwork.access(p,m.token,!get))return;
@@ -80,12 +83,13 @@ public final class PhotoTransfer{
   if(state==null||state.revision()!=m.revision||m.index<0||m.index>=state.photos().size())return;
   var photo=state.photos().get(m.index);
   if(get){
-   if(!fetched.computeIfAbsent(p,k->new HashSet<>()).add(m.index)||!downloadAllowed(p))return;
+   var inflight=fetched.computeIfAbsent(p,k->new HashSet<>());if(inflight.contains(m.index)||!downloadAllowed(p))return;
+   inflight.add(m.index);
    Path path=folder(p).resolve(photo.hash()+".rgb");var server=p.getServer();
-   async(()->{if(Files.size(path)!=BYTES)throw new java.io.IOException();byte[] bytes=Files.readAllBytes(path);
+   async(()->{try{if(Files.size(path)!=BYTES)throw new java.io.IOException();byte[] bytes=Files.readAllBytes(path);
     if(!hash(bytes).equals(photo.hash()))throw new java.io.IOException();
     server.execute(()->{if(BoardNetwork.access(p,m.token,false))for(int i=0;i<COUNT;i++)ServerPlayNetworking.send(p,new Part(m.token,m.revision,m.index,i,Arrays.copyOfRange(bytes,i*CHUNK,(i+1)*CHUNK)));});
-   },p);return;
+   }finally{server.execute(()->inflight.remove(m.index));}},p,()->inflight.remove(m.index));return;
   }
   if(state.started()||!budget(p))return;
   try{

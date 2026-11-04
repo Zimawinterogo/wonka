@@ -40,7 +40,9 @@ public final class TriggerAuthority {
   var b=p.getBoundingBox();
   return new TriggerEvidence.Body(p.getServerWorld().getRegistryKey().getValue().toString(),b.minX,b.minY,b.minZ,b.maxX,b.maxY,b.maxZ);
  }
+ static void reset(ServerPlayerEntity p){sessions.remove(p);manifests.remove(p);if(ServerPlayNetworking.canSend(p,Notice.ID))ServerPlayNetworking.send(p,new Notice(true,""));}
  private static Session session(ServerPlayerEntity p){
+  if(DuoTestMode.active(p)!=null)return null;
   if(!live(p)||!ServerPlayNetworking.canSend(p,Notice.ID)){sessions.remove(p);return null;}
   var catalog=StoryAuthority.catalog(p.getServer());var current=sessions.get(p);
   if(current==null&&catalog.rules().isEmpty())return null;

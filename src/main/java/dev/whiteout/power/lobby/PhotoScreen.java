@@ -26,7 +26,9 @@ final class PhotoScreen extends SharpScreen{
  private int x,y,angle;private boolean choosing;
  private String status="";
  PhotoScreen(BoardNetwork.View data){super(Text.literal("Фотографии"));this.data=data;editor=data.editor()&&!data.started();select(0);}
+ private static int attempts,waitTicks;
  static void register(){
+  net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(c->{if(current!=null&&c.currentScreen instanceof BoardScreen||current!=null&&c.currentScreen instanceof PhotoScreen){if(attempts<4&&++waitTicks>=85){waitTicks=0;attempts++;requestMissing(current);}}});
   ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->client.execute(()->{clear(client);current=null;}));
   ClientPlayNetworking.registerGlobalReceiver(Part.ID,(p,c)->c.client().execute(()->{
    if(current==null||!current.token().equals(p.token())||p.index()<0||p.index()>=pictures(current).size())return;
@@ -36,8 +38,11 @@ final class PhotoScreen extends SharpScreen{
   }));
  }
  static void opened(BoardNetwork.View data,MinecraftClient client){
-  current=data;incoming.clear();var photos=pictures(data);var keep=photos.stream().map(LobbyState.Photo::hash).toList();
+  current=data;attempts=1;waitTicks=0;incoming.clear();var photos=pictures(data);var keep=photos.stream().map(LobbyState.Photo::hash).toList();
   for(var it=cache.entrySet().iterator();it.hasNext();){var entry=it.next();if(!keep.contains(entry.getKey())){client.getTextureManager().destroyTexture(entry.getValue());it.remove();}}
+  requestMissing(data);
+ }
+ private static void requestMissing(BoardNetwork.View data){var photos=pictures(data);
   for(int i=0;i<photos.size();i++)if(!cache.containsKey(photos.get(i).hash()))ClientPlayNetworking.send(new Edit(data.token(),data.revision(),i,"get",0,0,0));
  }
  static void clear(MinecraftClient c){cache.values().forEach(c.getTextureManager()::destroyTexture);cache.clear();incoming.clear();}

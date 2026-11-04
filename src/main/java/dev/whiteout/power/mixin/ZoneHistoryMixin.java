@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ZoneHistoryMixin {
  @Redirect(target=@Desc(value="sync",args={ServerPlayerEntity.class,String.class}),at=@At(value="INVOKE",target="Ldev/whiteout/Store;networkSnapshot()Ldev/whiteout/Store$Data;"),remap=false)
  private static dev.whiteout.Store.Data whiteout$recipient(dev.whiteout.Store store,ServerPlayerEntity player,String message){
+  var test=dev.whiteout.power.DuoTestMode.active(player);if(test!=null)return test.snapshot(store.networkSnapshot());
   return dev.whiteout.power.ScopedStory.snapshot(store,player.getUuid());
  }
  @Inject(method="handle",at=@At("HEAD"),cancellable=true,remap=false)

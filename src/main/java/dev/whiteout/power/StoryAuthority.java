@@ -24,7 +24,7 @@ public final class StoryAuthority {
  private StoryAuthority(){}
  public static void register(){
   if(registered)return;registered=true;
-  StoryAuthorityNetwork.register();
+  DuoTestMode.register();StoryAuthorityNetwork.register();
   TriggerAuthority.register();DialogueBarrier.register();
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{BUDGETS.remove(h.getPlayer());WARNINGS.remove(h.getPlayer());});
   ServerLifecycleEvents.SERVER_STOPPED.register(s->{CATALOGS.remove(s);BUDGETS.clear();WARNINGS.clear();});
@@ -73,6 +73,7 @@ public final class StoryAuthority {
  public static boolean accept(ServerPlayerEntity player,WhiteoutActionPayload packet){
   if(!player.getServer().isOnThread())throw new IllegalStateException("Story requests require server thread");
   if(!"STORY_COMMIT".equals(packet.action())){
+   if(DuoTestMode.active(player)!=null&&!Set.of("REQUEST","EQUIP","BATTERY_TICK","REPLACE_BATTERY","GOGGLES").contains(packet.action()))return false;
    boolean allowed=StoryRequestPolicy.legacyAllowed(packet.action(),player.hasPermissionLevel(2));
    if(!allowed)denied(player,"permission or unknown action");return allowed;
   }
@@ -87,6 +88,7 @@ public final class StoryAuthority {
  public static StoryReceipts.Outcome execute(ServerPlayerEntity player,String key){
   if(!player.getServer().isOnThread())throw new IllegalStateException("Story requests require server thread");
   try{
+   var test=DuoTestMode.active(player);if(test!=null)return test.act(player,player.getUuid(),key);
    if(!player.isAlive()||player.isSpectator())throw new IllegalArgumentException("player state");
    StoryEventCatalog definitions=catalog(player.getServer());
    if(definitions.invalid())throw new IllegalStateException("invalid server catalog");
