@@ -1,5 +1,7 @@
 """Boot the packaged release twice on Fabric and exercise real block ticks and saves."""
 from pathlib import Path
+import hashlib
+import json
 import queue
 import shutil
 import subprocess
@@ -21,7 +23,7 @@ shutil.copy2(next((root / "build/release").glob("Whiteout-*.jar")), mods)
 (server / "eula.txt").write_text("eula=true\n")
 (server / "server.properties").write_text("server-ip=127.0.0.1\nserver-port=0\nview-distance=2\nsimulation-distance=2\nlevel-seed=314159\n")
 
-def boot(first):
+def boot(first, test_duo=False):
     process = subprocess.Popen(["java", "-Xmx2G", "-jar", "fabric-server-launch.jar", "nogui"], cwd=server, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     lines = queue.Queue()
     def drain():
@@ -45,17 +47,19 @@ def boot(first):
     try:
         wait('For help, type "help"', 180)
         command("forceload add 0 0")
-        if first:
+        if test_duo:
+            exercise_duo(command, wait)
+        elif first:
             command("tick freeze")
             command("fill 3 100 4 4 101 4 minecraft:stone")
             for i in range(4):
                 command(f"setblock {4-i%2} {100+i//2} 3 whiteout:story_board[facing=north,part={i}]")
             command("tick unfreeze")
-        for i in range(4):
+        for i in range(0 if test_duo else 4):
             marker = f"BOARD_CELL_{i}_PRESENT"
             command(f"execute if block {4-i%2} {100+i//2} 3 whiteout:story_board[part={i}] run say {marker}")
             wait(marker, 15)
-        if not first:
+        if not first and not test_duo:
             command("setblock 4 100 4 minecraft:air")
             wait("Changed the block", 15)
             for attempt in range(25):
@@ -75,6 +79,81 @@ def boot(first):
             process.kill()
             process.wait()
 
+def exercise_duo(command, wait):
+    name = "WoutQATester"
+    command("forceload add -16 -16 16 16")
+    command("fill -16 63 -4 15 63 7 minecraft:stone")
+    command("fill -16 64 -4 15 67 7 minecraft:air")
+    command(f"player {name} spawn at 12 64 1 in overworld")
+    wait("joined the game", 90)
+    command(f"gamemode creative {name}")
+    command("scoreboard objectives add qa dummy")
+    counter = 0
+    def action(text, ok=True):
+        nonlocal counter
+        counter += 1
+        token = f"QA_RESULT_{counter}_OK"
+        command(f"execute store result score result qa as {name} run whiteout test-duo {text}")
+        command(f"execute if score result qa matches {int(ok)} run say {token}")
+        wait(token, 10)
+    def move(x):
+        command(f"tp {name} {x} 64 1")
+        time.sleep(.5)
+    def progress():
+        path, = (server/"world"/"whiteout-duo-tests").glob("*.json")
+        return json.loads(path.read_text())
+    command(f"op {name}")
+    wait("server operator", 20)
+    action("enable confirm")
+    for branch in ("loss", "mercy", "letter"):
+        action("reset confirm")
+        move(12)
+        action("start")
+        action("start", False)
+        action("role first")
+        action("launch", False)
+        action("ready")
+        action("launch")
+        action("disconnect")
+        action("choose dialogue_choice:final_second:0:0", False)
+        action("reconnect")
+        if branch == "letter":
+            move(-12)
+            action("choose dialogue_choice:letter:0:0")
+            action("read")
+            move(12)
+        action("stay")
+        move(0)
+        assert "cutscene_trigger:final_meeting" not in progress().get("completedEvents", [])
+        action("follow")
+        time.sleep(.6)
+        action("read-self")
+        choice = "0" if branch == "loss" else "1"
+        action("choose dialogue_choice:final_second:0:" + choice)
+        action("choose dialogue_choice:final_second:0:" + choice, False)
+        assert "whiteout:ending/"+branch in progress()["completedEvents"]
+        action("disconnect")
+        action("reconnect")
+        # This headless operator never acknowledges the Director camera.
+        # Verify that the bounded production fallback actually completes the canonical exit.
+        end = time.monotonic() + 32
+        while "whiteout:example/"+branch+"_exit" not in progress()["completedEvents"]:
+            if time.monotonic() >= end:
+                raise AssertionError("Scene loading timeout did not recover")
+            time.sleep(.5)
+    action("disable")
+    action("state", False)
+    print("PASS dedicated Duo commands: isolation, readiness, movement, reconnect, three Once endings, unacknowledged camera recovery", flush=True)
+
 boot(True)
 boot(False)
+# Carpet supplies only the headless operator for this CI process. The Whiteout
+# participant under test is the release's UUID adapter and does not use Carpet.
+carpet = mods / "carpet-qa.jar"
+urllib.request.urlretrieve("https://cdn.modrinth.com/data/TQTTVgYE/versions/f2mvlGrg/fabric-carpet-1.21-1.4.147%2Bv240613.jar", carpet)
+assert hashlib.sha512(carpet.read_bytes()).hexdigest() == "e6f33d13406796a34e7598d997113f25f7bea3e55f9d334b73842adda52b2c5d0a86b7b12ac812d7e758861e3f468bf201c6c710c40162bb79d6818938204151"
+shutil.copy2(root/"docs/examples/duo-final-events.json", server/"world/whiteout-story-events.json")
+with (server/"server.properties").open("a") as props:
+    props.write("\nonline-mode=false\n")
+boot(False, test_duo=True)
 print("PASS packaged Fabric dedicated lobby board survives restart and loses support correctly")

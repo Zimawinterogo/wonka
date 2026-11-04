@@ -81,7 +81,10 @@ public final class Narrative{
   if(!finalEvent.serverOnly()||!finalEvent.once()||finalEvent.scope()!=ScopedStory.Scope.WORLD||finalEvent.narrative()!=null||finalEvent.world()!=null||
     !finalEvent.area().contains(pos.dimension(),pos.x(),pos.y(),pos.z()))throw new IllegalStateException("invalid ending definition");
   for(var scene:finalEvent.scenes())if(!CrisisRuntime.requestable(p.getServer(),scene))throw new IllegalStateException("ending scene missing");
-  var access=(SceneDelivery.Access)(Object)store.data;var old=access.whiteout$grants();access.whiteout$grants(SceneDelivery.prepare(p.getServer(),store,e.key(),ending.deliveries()));
+  return finish(store,e,ending,finalEvent,SceneDelivery.prepare(p.getServer(),store,e.key(),ending.deliveries()));
+ }
+ static StoryCommitTransaction.Result finish(Store store,StoryEventCatalog.Event e,Ending ending,StoryEventCatalog.Event finalEvent,SceneDelivery.Ledger grants)throws Exception{
+  var access=(SceneDelivery.Access)(Object)store.data;var old=access.whiteout$grants();access.whiteout$grants(grants);
   var sceneAccess=(SharedScene.Access)(Object)store.data;var previous=sceneAccess.whiteout$scene();
   boolean saved=false;try{if(ending.finale()!=null){if(previous!=null||store.data.completedEvents.contains(ending.finale().completion()))throw new IllegalStateException("finale unavailable");sceneAccess.whiteout$scene(new SharedScene.Playing(UUID.randomUUID(),ending.finale(),0));}
    var outcome=StoryCommitTransaction.apply(store,e,state->{

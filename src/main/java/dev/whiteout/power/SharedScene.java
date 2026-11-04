@@ -43,16 +43,16 @@ public final class SharedScene{
   var r=current(store);if(r==null||store.error!=null){runtime.remove(store);return;}
   var d=LobbyState.get(store);if(d==null||!d.started())return;var st=runtime.computeIfAbsent(store,k->new Session());
   if(!r.id.equals(st.id)){st.id=r.id;st.elapsed=r.elapsed;st.sent.clear();st.loaded.clear();st.votes.clear();st.requested.clear();}
-  var players=new ArrayList<ServerPlayerEntity>();for(var id:new UUID[]{d.first(),d.second()})if(id!=null){var p=s.getPlayerManager().getPlayer(id);if(p!=null)players.add(p);}
-  boolean pause=(test==null?Party.paused(s):!test.connected)||players.isEmpty();
+  var players=new ArrayList<ServerPlayerEntity>();for(var id:new UUID[]{d.first(),d.second()})if(id!=null){var p=s.getPlayerManager().getPlayer(id);if(p!=null&&(test==null||id.equals(test.operator)))players.add(p);}
+  boolean pause=(test==null?Party.paused(s):!test.connected&&!test.alone)||players.isEmpty();
   for(var p:players)if(st.sent.add(p.getUuid())){st.requested.put(p.getUuid(),s.getTicks());send(p,r,"scene",r.spec.scene+" "+st.elapsed);send(p,r,"pause","1");}
   for(var p:players)if(!st.loaded.contains(p.getUuid())&&s.getTicks()-st.requested.getOrDefault(p.getUuid(),s.getTicks())>=200)fallback(p,r,st);
-  boolean waiting=pause||(test!=null&&!test.botLoaded(r.id(),s.getTicks()))||players.stream().anyMatch(p->!st.loaded.contains(p.getUuid()));
+  boolean waiting=pause||(test!=null&&test.connected&&!test.botLoaded(r.id(),s.getTicks()))||players.stream().anyMatch(p->!st.loaded.contains(p.getUuid()));
   if(st.paused!=waiting||!waiting&&st.elapsed==r.elapsed){for(var p:players)send(p,r,"pause",waiting?"1":"0");st.paused=waiting;}
   if(waiting)return;
   var access=(Access)(Object)store.data;st.elapsed=Math.min(r.spec.ticks,st.elapsed+1);
   try{
-   if(st.elapsed>=r.spec.ticks||(test==null||test.botSkip)&&players.stream().allMatch(p->st.votes.contains(p.getUuid()))){
+   if(st.elapsed>=r.spec.ticks||(test==null||!test.connected&&test.alone||test.botSkip)&&players.stream().allMatch(p->st.votes.contains(p.getUuid()))){
     var exit=StoryAuthority.definition(s,r.spec.completion);if(!exit.serverOnly()||!exit.once()||exit.narrative()!=null)throw new IllegalArgumentException("completion changed");
     boolean eligible=players.stream().anyMatch(p->exit.area().contains(p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ())&&StoryWorldConditions.evaluate(exit.world(),new StoryWorldSource(p,store.data))==WinterCrisisConditions.Truth.TRUE);
     if(!eligible)return;

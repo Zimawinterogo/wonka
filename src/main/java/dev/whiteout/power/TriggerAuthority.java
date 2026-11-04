@@ -74,6 +74,7 @@ public final class TriggerAuthority {
  }
  public static int signal(ServerPlayerEntity p,String name){return arm(p,TriggerEvidence.Kind.SIGNAL,name);}
  private static int arm(ServerPlayerEntity p,TriggerEvidence.Kind kind,String target){
+  var test=DuoTestMode.active(p);if(test!=null)return test.arm(p,p.getUuid(),kind,target);
   Session s=session(p);if(s==null)return 0;int count=0;
   for(var rule:s.catalog().rules()){
    if(rule.binding().type()==kind&&target.equalsIgnoreCase(rule.binding().target())&&position(rule,p)&&eligible(p,s,rule.key())){
