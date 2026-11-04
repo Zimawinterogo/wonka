@@ -19,11 +19,11 @@ final class PartyScreen extends SharpScreen{
  }));}
  private static final String[] labels={"Ген. новый %","Ген. старый %","Лампа мин","Заряд мин","Фонарь мин","Отказ %","Проверка сек","Метель сек","Снег сек"};
  private void request(String action,String value){ClientPlayNetworking.send(new Party.Request(view.token(),state.revision(),action,value));}
- private void btn(int x,int y,int w,String t,Runnable r){addDrawableChild(LobbyUi.button(Text.literal(t),x,y,w,19,r));}
+ private LobbyUi.Btn btn(int x,int y,int w,String t,Runnable r){return addDrawableChild(LobbyUi.button(Text.literal(t),x,y,w,19,r));}
  private String name(UUID id){return state.online().stream().filter(p->p.id().equals(id)).map(Party.Person::name).findFirst().orElse("офлайн");}
  @Override protected void init(){
   if(state==null||!view.token().equals(token))return;
-  var box=LobbyUi.Box.centered(width,height,386,234);int x=box.x()+22,y=box.y()+30;var me=client.player.getUuid();
+  var box=LobbyUi.Box.centered(width,height,406,248);int x=box.x()+22,y=box.y()+30;var me=client.player.getUuid();
   btn(x+204,y+177,72,"Назад",()->close());
   if(tab==1){
    String[] val={"","","","",""};var start=state.start();
@@ -38,7 +38,7 @@ final class PartyScreen extends SharpScreen{
    }catch(RuntimeException ex){error="Проверьте координаты и ID";}});return;
   }
   if(tab==2){int i=0;for(var level:List.of("easy","normal","hard")){
-    btn(x+64,y+22+i*23,156,List.of("Лёгкая","Нормальная","Сложная").get(i),()->request("difficulty",level));i++;}
+    var option=btn(x+64,y+22+i*23,156,List.of("Лёгкая","Нормальная","Сложная").get(i),()->request("difficulty",level));option.selected=state.balance()!=null&&level.equals(state.balance().preset());i++;}
    btn(x+64,y+95,156,"Своя…",()->{tab=3;clearAndInit();});return;}
   if(tab==3){
    var b=state.balance()==null?Balance.preset("normal"):state.balance();int[] values={b.newFuel(),b.oldFuel(),b.lampMinutes(),b.chargeMinutes(),b.torchMinutes(),b.fusePercent(),b.fuseSeconds(),b.stormSeconds(),b.snowSeconds()};
@@ -59,30 +59,45 @@ final class PartyScreen extends SharpScreen{
   }
  }
  @Override public void render(DrawContext d,int mx,int my,float dt){
-  var b=LobbyUi.Box.centered(width,height,386,234);int x=b.x()+22,y=b.y()+30;
-  LobbyUi.backdrop(d,width,height);LobbyUi.board(d,b);
-  LobbyUi.fit(d,textRenderer,tab==0?"УЧАСТНИКИ / ЛОББИ":tab==1?"НАСТРОЙКА СТАРТА":tab==2?"УРОВЕНЬ СЛОЖНОСТИ":"РУЧНАЯ НАСТРОЙКА",b.x()+20,b.y()+11,b.w()-40,LobbyUi.LIGHT,false,0);
-  LobbyUi.paper(d,x-9,y-8,Math.min(294,b.right()-x-7),174);
-  LobbyUi.pin(d,x,y-2);LobbyUi.pin(d,b.right()-21,y+3);
+  var box=LobbyUi.Box.centered(width,height,406,248);int x=box.x()+22,y=box.y()+30;
+  LobbyUi.backdrop(d,width,height);LobbyUi.board(d,box);
+  LobbyUi.accent(d,box.x()+17,box.y()+11,14,0xffbd3e3c);
+  LobbyUi.fit(d,textRenderer,tab==0?"DUO / УЧАСТНИКИ":tab==1?"НАСТРОЙКА СТАРТА":tab==2?"УРОВЕНЬ СЛОЖНОСТИ":"РУЧНАЯ СЛОЖНОСТЬ",box.x()+27,box.y()+12,box.w()-51,LobbyUi.LIGHT,false,0);
+  LobbyUi.divider(d,box.x()+17,box.y()+37,box.w()-34);
+  LobbyUi.paper(d,x-9,y+12,Math.min(294,box.right()-x-7),160);
   if(tab==1){
-   String[] labels={"Измерение","X","Y","Z","Событие"};
-   for(int i=0;i<5;i++)d.drawText(textRenderer,labels[i],x+1,y+6+i*23,LobbyUi.INK,false);
-   LobbyUi.fit(d,textRenderer,error,x,y+165,260,0xff963f36,false,0);
+   String[] lab={"Измерение","X","Y","Z","Событие"};
+   for(int i=0;i<5;i++){
+    LobbyUi.fit(d,textRenderer,lab[i],x+2,y+19+i*23,79,LobbyUi.INK_SOFT,false,0);
+    if(fields[i]!=null)LobbyUi.plate(d,fields[i]);
+   }
+   LobbyUi.fit(d,textRenderer,error,x+2,y+166,270,0xffe48483,false,0);
   }else if(tab==2){
-   LobbyUi.fit(d,textRenderer,"Сложность: "+(state.balance()==null?"по миру":state.balance().label()),x+13,y+4,255,LobbyUi.INK,false,0);
+   LobbyUi.fit(d,textRenderer,"ВЫБЕРИ РЕЖИМ ВЫЖИВАНИЯ",x+12,y+20,270,LobbyUi.INK_SOFT,false,0);
+   LobbyUi.fit(d,textRenderer,state.balance()==null?"ПРЕСЕТ: ПО МИРУ":"ПРЕСЕТ: "+state.balance().label(),x+12,y+153,260,LobbyUi.INK_SOFT,false,0);
   }else if(tab==3){
-   for(int i=0;i<9;i++)d.drawText(textRenderer,labels[i],x+(i/5)*144,y+23+(i%5)*22,LobbyUi.INK_SOFT,false);
-   LobbyUi.fit(d,textRenderer,error,x,y+128,260,0xff963f36,false,0);
+   for(int i=0;i<9;i++){
+    LobbyUi.fit(d,textRenderer,labels[i],x+(i/5)*144,y+24+(i%5)*22,84,LobbyUi.INK_SOFT,false,0);
+    if(fields[i]!=null)LobbyUi.plate(d,fields[i]);
+   }
+   LobbyUi.fit(d,textRenderer,error,x,y+132,270,0xffe48483,false,0);
   }else if(state!=null){
-   LobbyUi.fit(d,textRenderer,state.host()==null?"SOLO / ПРИГЛАСИТЕ ИГРОКА":"FIRST: "+name(state.host()),x+8,y+5,262,LobbyUi.INK,false,0);
-   if(state.partner()!=null){
-    LobbyUi.fit(d,textRenderer,"SECOND: "+name(state.partner()),x+8,y+22,253,LobbyUi.INK,false,0);
-    LobbyUi.fit(d,textRenderer,"Готовность "+((state.mine()?1:0)+(state.other()?1:0))+"/2",x+8,y+38,253,LobbyUi.INK_SOFT,false,0);
-    LobbyUi.led(d,x+260,y+24,state.mine()&&state.other()?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
-   }else if(state.invited()!=null)LobbyUi.fit(d,textRenderer,"Приглашён: "+name(state.invited()),x+8,y+23,253,LobbyUi.INK_SOFT,false,0);
-   if(state.started())LobbyUi.fit(d,textRenderer,"ИСТОРИЯ УЖЕ ЗАПУЩЕНА",x+8,y+66,253,LobbyUi.INK_SOFT,false,0);
+   LobbyUi.chalk(d,x+4,y+19,275,29);
+   LobbyUi.accent(d,x+5,y+22,20,0xff537992);
+   LobbyUi.caption(d,textRenderer,"FIRST",x+13,y+23,47,LobbyUi.LIGHT_DIM);
+   LobbyUi.fit(d,textRenderer,state.host()==null?"Выбор ведущего":name(state.host()),x+65,y+23,186,LobbyUi.INK,false,0);
+   LobbyUi.led(d,x+254,y+24,state.mine()?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
+   LobbyUi.chalk(d,x+4,y+51,275,29);
+   LobbyUi.accent(d,x+5,y+54,20,0xffbd514c);
+   LobbyUi.caption(d,textRenderer,"SECOND",x+13,y+55,48,LobbyUi.LIGHT_DIM);
+   LobbyUi.fit(d,textRenderer,state.partner()!=null?name(state.partner()):state.invited()!=null?"Приглашение отправлено":"Напарник не выбран",x+65,y+55,186,LobbyUi.INK,false,0);
+   LobbyUi.led(d,x+254,y+56,state.partner()!=null&&state.other()?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
+   String status=state.partner()!=null?"ГОТОВНОСТЬ "+((state.mine()?1:0)+(state.other()?1:0))+"/2":
+     state.invited()!=null?"ОЖИДАНИЕ ПОДТВЕРЖДЕНИЯ":"SOLO";
+   LobbyUi.fit(d,textRenderer,status,x+13,y+91,253,LobbyUi.INK_SOFT,false,0);
+   if(state.started())LobbyUi.fit(d,textRenderer,"ИСТОРИЯ УЖЕ ЗАПУЩЕНА",x+13,y+154,253,LobbyUi.LIGHT_DIM,false,0);
   }
-  LobbyUi.caption(d,textRenderer,"WHITEOUT / STORY BOARD",b.x()+19,b.bottom()-14,b.w()-39,LobbyUi.LIGHT_DIM);
+  LobbyUi.caption(d,textRenderer,"WHITEOUT / LOBBY CONTROL",box.x()+17,box.bottom()-14,box.w()-34,LobbyUi.LIGHT_DIM);
   super.render(d,mx,my,dt);
  }
  @Override public void close(){client.setScreen(new BoardScreen(view));}
