@@ -24,7 +24,7 @@ final class PartyScreen extends SharpScreen{
  @Override protected void init(){
   if(state==null||!view.token().equals(token))return;
   var box=LobbyUi.Box.centered(width,height,406,248);int x=box.x()+22,y=box.y()+30;var me=client.player.getUuid();
-  btn(x+204,y+177,72,"Назад",()->close());
+  btn(x+204,y+181,72,"Назад",()->close());
   if(tab==1){
    String[] val={"","","","",""};var start=state.start();
    if(start!=null){if(start.dimension()!=null){val[0]=start.dimension();val[1]=""+start.x();val[2]=""+start.y();val[3]=""+start.z();}if(start.event()!=null)val[4]=start.event();}
@@ -47,14 +47,14 @@ final class PartyScreen extends SharpScreen{
    btn(x+144,y+141,138,"Сохранить",()->{try{int[] n=Arrays.stream(fields).mapToInt(t->Integer.parseInt(t.getText())).toArray();request("difficulty",BoardNetwork.JSON.toJson(new Balance("custom",n[0],n[1],n[2],n[3],n[4],n[5],n[6],n[7],n[8])));}catch(RuntimeException ex){error="Проверьте диапазоны";}});return;
   }
   if(!state.started()){
-   if(me.equals(state.invited())){btn(x,y+43,134,"Принять приглашение",()->request("accept",""));btn(x+142,y+43,134,"Отклонить",()->request("decline",""));return;}
+   if(me.equals(state.invited())){btn(x,y+106,134,"Принять приглашение",()->request("accept",""));btn(x+142,y+106,134,"Отклонить",()->request("decline",""));return;}
    if(state.partner()!=null){if(me.equals(state.host())||me.equals(state.partner())){
-    btn(x,y+48,134,state.mine()?"Снять готовность":"Я готов",()->request("ready",""));btn(x+142,y+48,134,"Покинуть Duo",()->request("solo",""));}return;}
+    btn(x,y+106,134,state.mine()?"Снять готовность":"Я готов",()->request("ready",""));btn(x+142,y+106,134,"Покинуть Duo",()->request("solo",""));}return;}
    if(state.host()==null||me.equals(state.host())){
     var list=state.online().stream().filter(p->!p.id().equals(me)).toList();
-    for(int i=page*4;i<Math.min(page*4+4,list.size());i++){var who=list.get(i);btn(x+30,y+42+(i%4)*21,224,"Пригласить · "+who.name(),()->request("invite",who.id().toString()));}
-    if(page>0)btn(x,y+130,24,"‹",()->{page--;clearAndInit();});if(page*4+4<list.size())btn(x+250,y+130,24,"›",()->{page++;clearAndInit();});
-    if(me.equals(state.host()))btn(x+65,y+142,150,"Вернуться в Solo",()->request("solo",""));
+    for(int i=page*3;i<Math.min(page*3+3,list.size());i++){var who=list.get(i);btn(x+29,y+105+(i%3)*20,225,"Пригласить · "+who.name(),()->request("invite",who.id().toString()));}
+    if(page>0)btn(x,y+173,24,"‹",()->{page--;clearAndInit();});if(page*3+3<list.size())btn(x+250,y+173,24,"›",()->{page++;clearAndInit();});
+    if(me.equals(state.host()))btn(x+10,y+181,150,"Вернуться в Solo",()->request("solo",""));
    }
   }
  }
