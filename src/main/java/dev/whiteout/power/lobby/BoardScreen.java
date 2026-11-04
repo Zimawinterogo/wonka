@@ -16,9 +16,10 @@ public final class BoardScreen extends SharpScreen {
  private static final String[] NAMES={"title","description","author","duration","note"};
  private static final int[] LIMIT={80,320,64,48,160};
  private static Text tr(String key){return Text.translatable("board.whiteout."+key);}
- private BoardScreen(BoardNetwork.View data){super(tr("board"));this.data=data;}
+ BoardScreen(BoardNetwork.View data){super(tr("board"));this.data=data;}
  public static void register(){
-  ClientPlayNetworking.registerGlobalReceiver(BoardNetwork.View.ID,(msg,ctx)->ctx.client().execute(()->ctx.client().setScreen(new BoardScreen(msg))));
+  PhotoScreen.register();
+  ClientPlayNetworking.registerGlobalReceiver(BoardNetwork.View.ID,(msg,ctx)->ctx.client().execute(()->{PhotoScreen.opened(msg,ctx.client());ctx.client().setScreen(new BoardScreen(msg));}));
  }
  private int w(){return Math.min(width-16,374);}
  private int left(){return (width-w())/2;}
@@ -47,6 +48,7 @@ public final class BoardScreen extends SharpScreen {
    save.active=!fields[0].getText().isBlank();fields[0].setChangedListener(v->save.active=!v.isBlank());setInitialFocus(fields[0]);return;
   }
   if(data.editor()&&!data.started())button(Text.literal("⚙"),x+w-34,y+6,26,()->{editing=true;clearAndInit();}).setTooltip(Tooltip.of(tr("edit")));
+  if(data.card()!=null&&(data.editor()||!PhotoTransfer.pictures(data).isEmpty()))button(Text.literal("Фото"),x+w-91,y+6,52,()->client.setScreen(new PhotoScreen(data)));
   if(lines().size()>9){
    button(Text.literal("‹"),x+10,y+166,24,()->{page--;clearAndInit();}).active=page>0;
    button(Text.literal("›"),x+w-34,y+166,24,()->{page++;clearAndInit();}).active=(page+1)*9<lines().size();
@@ -57,7 +59,7 @@ public final class BoardScreen extends SharpScreen {
   var lines=new java.util.ArrayList<net.minecraft.text.OrderedText>();var v=values();
   for(int i=1;i<v.length;i++)if(!v[i].isBlank()){
    Text line=i==1?Text.literal(v[i]):tr(NAMES[i]).copy().append(" · ").append(v[i]);
-   lines.addAll(textRenderer.wrapLines(line,w()-44));
+   lines.addAll(textRenderer.wrapLines(line,w()-44-(PhotoTransfer.pictures(data).isEmpty()?0:90)));
   }
   return lines;
  }
@@ -73,6 +75,7 @@ public final class BoardScreen extends SharpScreen {
   }else{
    var c=data.card();
    d.drawText(textRenderer,c==null?tr("board"):Text.literal(textRenderer.trimToWidth(c.title(),w-74)),x+24,y+16,0x382c20,false);
+   PhotoScreen.mainPhoto(d,data,x+w-56,y+95);
    int row=y+38;
    if(c==null)d.drawTextWrapped(textRenderer,tr("empty"),x+22,row,w-44,0x504336);
    else{
