@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value=WhiteoutNetwork.class,remap=false)
 public abstract class ZoneHistoryMixin {
- @Redirect(method="sync",at=@At(value="INVOKE",target="Ldev/whiteout/Store;networkSnapshot()Ldev/whiteout/Store$Data;"),remap=false)
+ @Redirect(target=@Desc(value="sync",args={ServerPlayerEntity.class,String.class}),at=@At(value="INVOKE",target="Ldev/whiteout/Store;networkSnapshot()Ldev/whiteout/Store$Data;"),remap=false)
  private static dev.whiteout.Store.Data whiteout$recipient(dev.whiteout.Store store,ServerPlayerEntity player,String message){
   return dev.whiteout.power.ScopedStory.snapshot(store,player.getUuid());
  }
