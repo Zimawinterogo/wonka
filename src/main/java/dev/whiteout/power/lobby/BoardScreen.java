@@ -18,7 +18,7 @@ public final class BoardScreen extends SharpScreen {
  private static Text tr(String key){return Text.translatable("board.whiteout."+key);}
  BoardScreen(BoardNetwork.View data){super(tr("board"));this.data=data;}
  public static void register(){
-  PartyScreen.register();PhotoScreen.register();
+  AuthorScreen.register();PartyScreen.register();PhotoScreen.register();
   ClientPlayNetworking.registerGlobalReceiver(BoardNetwork.View.ID,(msg,ctx)->ctx.client().execute(()->{PhotoScreen.opened(msg,ctx.client());ctx.client().setScreen(new BoardScreen(msg));}));
  }
  private int w(){return Math.min(width-16,374);}
@@ -44,10 +44,12 @@ public final class BoardScreen extends SharpScreen {
     var field=new TextFieldWidget(textRenderer,x+w/3,y+26+i*26,w-w/3-14,20,tr(NAMES[i]));
     field.setMaxLength(LIMIT[i]);field.setText(values[i]);fields[i]=addDrawableChild(field);
    }
+   button(Text.literal("Сценарий"),x+8,y+167,78,()->client.setScreen(new AuthorScreen(data)));
    var save=button(tr("save"),x+w/2-46,y+167,92,()->send(new LobbyState.Card(fields[0].getText(),fields[1].getText(),fields[2].getText(),fields[3].getText(),fields[4].getText())));
    save.active=!fields[0].getText().isBlank();fields[0].setChangedListener(v->save.active=!v.isBlank());setInitialFocus(fields[0]);return;
   }
-  if(data.editor()&&!data.started())button(Text.literal("⚙"),x+w-34,y+6,26,()->{editing=true;clearAndInit();}).setTooltip(Tooltip.of(tr("edit")));
+  button(Text.literal("♪"),x+w-121,y+6,24,()->client.setScreen(new PersonalScreen(data))).setTooltip(Tooltip.of(Text.literal("Личные настройки")));
+  if(data.editor()&&!data.started()){var gear=button(Text.literal("⚙"),x+w-34,y+6,26,()->{editing=true;clearAndInit();});if(PersonalScreen.prefs().hints())gear.setTooltip(Tooltip.of(tr("edit")));}
   if(data.card()!=null&&(data.editor()||!PhotoTransfer.pictures(data).isEmpty()))button(Text.literal("Фото"),x+w-91,y+6,52,()->client.setScreen(new PhotoScreen(data)));
   if(data.card()!=null){
    button(Text.literal("Участники"),x+12,y+140,74,()->client.setScreen(new PartyScreen(data,0)));

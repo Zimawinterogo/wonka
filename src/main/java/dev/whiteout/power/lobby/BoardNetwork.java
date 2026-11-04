@@ -67,7 +67,7 @@ public final class BoardNetwork{
     dev.whiteout.net.WhiteoutNetwork.syncAll(server);
     c.getSource().sendFeedback(()->Text.translatable("board.whiteout.reset"),true);return 1;
    }))))));
-  Party.register();PhotoTransfer.register();
+  Party.register();PhotoTransfer.register();StoryAuthor.register();
   PayloadTypeRegistry.playS2C().register(View.ID,View.CODEC);PayloadTypeRegistry.playC2S().register(Change.ID,Change.CODEC);
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->sessions.remove(h.getPlayer()));
   ServerPlayNetworking.registerGlobalReceiver(Change.ID,(msg,ctx)->ctx.server().execute(()->{

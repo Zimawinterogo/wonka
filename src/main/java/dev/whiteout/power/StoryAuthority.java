@@ -50,6 +50,7 @@ public final class StoryAuthority {
      c.getSource().sendFeedback(()->Text.literal("Story authority reloaded: events="+catalog.size()+", invalid="+catalog.invalid()),false);return catalog.invalid()?0:1;
     })))));
  }
+ public static void reload(MinecraftServer server){CATALOGS.remove(server);catalog(server);}
  static StoryEventCatalog catalog(MinecraftServer server){
   return CATALOGS.computeIfAbsent(server,s->new StoryEventCatalog(s.getSavePath(WorldSavePath.ROOT).resolve("whiteout-story-events.json")));
  }

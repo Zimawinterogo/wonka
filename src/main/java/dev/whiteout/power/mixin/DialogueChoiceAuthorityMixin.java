@@ -13,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value=DialogueScreen.class,remap=false)
 public abstract class DialogueChoiceAuthorityMixin {
  @Unique private int whiteout$choiceIndex;
+ @ModifyArg(method={"tick","method_25393"},at=@At(value="INVOKE",target="Ljava/lang/Math;min(II)I",ordinal=0),index=1,remap=false)
+ private int whiteout$readingSpeed(int ticks){return ticks*dev.whiteout.power.lobby.PersonalScreen.prefs().letters();}
  @Shadow private String choiceKey(int index){throw new AssertionError();}
  @Redirect(method="choose",at=@At(value="INVOKE",target="Ldev/whiteout/client/DialogueManager$Choice;once()Z"),remap=false)
  private boolean whiteout$requiresConfirmation(DialogueManager.Choice choice){

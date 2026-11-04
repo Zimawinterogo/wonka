@@ -46,7 +46,7 @@ public final class StoryPortraits {
  public static void drawAvatar(DrawContext ctx,TextRenderer font,String initial,
                                int initialX,int initialY,int initialColor,
                                Object bubble,Entity directNpc,int tileX,int tileY){
-  if(!drawPortrait(ctx,bubble,directNpc,tileX,tileY)){
+  if(!dev.whiteout.power.lobby.PersonalScreen.prefs().portraits()||!drawPortrait(ctx,bubble,directNpc,tileX,tileY)){
    // Missing skin or unloaded NPC: preserve the game's readable fallback.
    ctx.drawCenteredTextWithShadow(font,initial,initialX,initialY,initialColor);
   }

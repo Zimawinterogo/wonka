@@ -82,7 +82,7 @@ public final class StoryDialogueHud {
   display.init(mc,mc.getWindow().getScaledWidth(),mc.getWindow().getScaledHeight());
   lastWidth=mc.getWindow().getScaledWidth();lastHeight=mc.getWindow().getScaledHeight();
   // 2 letters/tick; afterwards leave the entire sentence visible long enough.
-  remaining=Math.max(50,(current.line.text().length()+1)/2+55);
+  remaining=Math.max(50,(current.line.text().length()+1)/(2*dev.whiteout.power.lobby.PersonalScreen.prefs().letters())+55);
  }
  public static void tick(MinecraftClient mc){
   if(mc.world==null||mc.player==null){clear();return;}
