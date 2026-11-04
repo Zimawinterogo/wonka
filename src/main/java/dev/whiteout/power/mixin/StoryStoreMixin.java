@@ -22,6 +22,7 @@ public abstract class StoryStoreMixin {
  @Inject(method="networkSnapshot",at=@At("RETURN"))
  private void whiteout$privateProgress(CallbackInfoReturnable<Store.Data> ci){
   ((ScopedStory.Players)(Object)ci.getReturnValue()).whiteout$players().clear();
+  ((dev.whiteout.power.lobby.LobbyState.Access)(Object)ci.getReturnValue()).whiteout$lobby(null);
  }
  @Inject(method="<init>(Ljava/nio/file/Path;)V",at=@At("RETURN"))
  private void whiteout$incompleteSave(Path path,CallbackInfo ci){

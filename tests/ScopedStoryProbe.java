@@ -15,8 +15,26 @@ public class ScopedStoryProbe {
   var alice=UUID.randomUUID();var bob=UUID.randomUUID();
   try{
    var store=StoryStoreReader.open(path);store.save();
+   for(var face:net.minecraft.util.math.Direction.Type.HORIZONTAL){
+    var anchor=new net.minecraft.util.math.BlockPos(15,64,-16);
+    var parts=new HashSet<net.minecraft.util.math.BlockPos>();
+    for(int i=0;i<4;i++){
+     var state=PowerDevices.STORY_BOARD.getDefaultState().with(dev.whiteout.power.lobby.BoardBlock.FACE,face).with(dev.whiteout.power.lobby.BoardBlock.PART,i);
+     var p=dev.whiteout.power.lobby.BoardBlock.cell(anchor,face,i);
+     check(parts.add(p)&&dev.whiteout.power.lobby.BoardBlock.root(p,state).equals(anchor),"four distinct cells share anchor");
+    }
+   }
+   var card=new dev.whiteout.power.lobby.LobbyState.Card("Whiteout","Arrival","","","");
+   dev.whiteout.power.lobby.LobbyState.edit(store,0,card);
+   try{dev.whiteout.power.lobby.LobbyState.edit(store,0,card);throw new AssertionError("stale edit");}catch(IllegalStateException expected){}
+   Files.createDirectory(tmp);
+   try{dev.whiteout.power.lobby.LobbyState.startSolo(store,1,alice);throw new AssertionError("failed start");}catch(java.io.IOException expected){}
+   Files.delete(tmp);check(!dev.whiteout.power.lobby.LobbyState.get(store).started(),"failed start rolled back");
+   dev.whiteout.power.lobby.LobbyState.startSolo(store,1,alice);store=StoryStoreReader.open(path);
+   check(dev.whiteout.power.lobby.LobbyState.get(store).first().equals(alice)&&store.data.completedEvents.contains(dev.whiteout.power.lobby.LobbyState.STARTED),"persisted start and host");
+   try{dev.whiteout.power.lobby.LobbyState.startSolo(store,2,bob);throw new AssertionError("duplicate start");}catch(IllegalStateException expected){}
    var legacy=com.google.gson.JsonParser.parseString(Files.readString(path)).getAsJsonObject();
-   legacy.remove("playerStory");Files.writeString(path,legacy.toString());
+   legacy.remove("playerStory");legacy.remove("storyLobby");Files.writeString(path,legacy.toString());
    store=StoryStoreReader.open(path);check(store.error==null,"legacy file loaded");
    var event=Store.GSON.fromJson("""
     {"key":"dialogue_choice:test:0:1","once":true,"scope":"PLAYER","checkpoint":"camp",

@@ -38,6 +38,8 @@ public final class PowerDevices implements ModInitializer {
  public static final BlockEntityType<BackupLampEntity> EMERGENCY_LAMP_ENTITY=Registry.register(Registries.BLOCK_ENTITY_TYPE,id("emergency_lamp_entity"),FabricBlockEntityTypeBuilder.create(BackupLampEntity::new,EMERGENCY_LAMP).build());
  public static final Block RIME_GLASS_PANE=buildingBlock("rime_glass_pane",new PaneBlock(AbstractBlock.Settings.copy(Blocks.GLASS_PANE).nonOpaque()));
  public static final Block FROST_WINDOW=buildingBlock("frost_window",new FrostWindowBlock(AbstractBlock.Settings.copy(Blocks.GLASS).nonOpaque().ticksRandomly()));
+ public static final dev.whiteout.power.lobby.BoardBlock STORY_BOARD=Registry.register(Registries.BLOCK,id("story_board"),new dev.whiteout.power.lobby.BoardBlock(AbstractBlock.Settings.copy(Blocks.SPRUCE_PLANKS).nonOpaque().pistonBehavior(net.minecraft.block.piston.PistonBehavior.BLOCK)));
+ public static final Item STORY_BOARD_ITEM=item("story_board",new dev.whiteout.power.lobby.BoardBlock.WallItem(STORY_BOARD));
  public static final Block THERMOMETER=buildingBlock("wall_thermometer",new ThermometerBlock(AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).nonOpaque()));
  public static final SoundEvent ENGINE=sound("generator_engine"),PULL=sound("generator_pull"),START=sound("generator_start"),STOP=sound("generator_stop"),CLICK=sound("fuse_click"),FAIL=sound("generator_fail"),OLD_GEN_LOOP=sound("old_generator_loop"),OLD_GEN_START=sound("old_generator_start"),OLD_GEN_STOP=sound("old_generator_stop"),OLD_GEN_CATCH=sound("old_generator_catch"),OLD_GEN_FAIL=sound("old_generator_fail"),OLD_CREAK=sound("old_house_creak"),OLD_RATTLE=sound("old_window_rattle"),OLD_SLAM=sound("old_door_slam"),ICE_CRACK=sound("door_ice_crack");
  // Keep generator_fail unchanged: the electrical outage also uses that event.
@@ -54,12 +56,13 @@ public final class PowerDevices implements ModInitializer {
  static Item item(String name,Item item){return Registry.register(Registries.ITEM,id(name),item);}
  static SoundEvent sound(String name){return Registry.register(Registries.SOUND_EVENT,id(name),SoundEvent.of(id(name)));}
  @Override public void onInitialize(){
+  dev.whiteout.power.lobby.BoardNetwork.register();
   StoryAuthority.register();
   dev.whiteout.power.backpack.BackpackNetwork.register();
   Registry.register(Registries.ITEM,id("power_switch"),new BlockItem(POWER_SWITCH,new Item.Settings()));
   Registry.register(Registries.ITEM,id("emergency_lamp"),new BlockItem(EMERGENCY_LAMP,new Item.Settings()));
   Registry.register(Registries.ITEM_GROUP,id("power_objects"),FabricItemGroup.builder().displayName(Text.translatable("itemGroup.whiteout.power_objects")).icon(()->new ItemStack(GENERATOR)).entries((c,e)->{e.add(GENERATOR);e.add(OLD_GENERATOR);e.add(PANEL);e.add(SHELF);e.add(EMERGENCY_LAMP);e.add(POWER_SWITCH);e.add(FUEL);e.add(EMPTY_CAN);e.add(FUSE);e.add(UNSTABLE_FUSE);e.add(CIRCUIT_LINKER);}).build());
-  Registry.register(Registries.ITEM_GROUP,id("building_materials"),FabricItemGroup.builder().displayName(Text.translatable("itemGroup.whiteout.building_materials")).icon(()->new ItemStack(ROTTEN_SPRUCE_PLANKS)).entries((c,e)->{e.add(ROTTEN_SPRUCE_PLANKS);e.add(RIME_GLASS_PANE);e.add(FROST_WINDOW);e.add(THERMOMETER);}).build());
+  Registry.register(Registries.ITEM_GROUP,id("building_materials"),FabricItemGroup.builder().displayName(Text.translatable("itemGroup.whiteout.building_materials")).icon(()->new ItemStack(ROTTEN_SPRUCE_PLANKS)).entries((c,e)->{e.add(ROTTEN_SPRUCE_PLANKS);e.add(RIME_GLASS_PANE);e.add(FROST_WINDOW);e.add(THERMOMETER);e.add(STORY_BOARD_ITEM);}).build());
   EnvironmentNetwork.register();
   WorldAtmosphere.register();
   PowerNetwork.register();
