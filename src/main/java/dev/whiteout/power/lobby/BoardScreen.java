@@ -3,6 +3,7 @@ package dev.whiteout.power.lobby;
 import dev.whiteout.power.SharpScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.*;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
