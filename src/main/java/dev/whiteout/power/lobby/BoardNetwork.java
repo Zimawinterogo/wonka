@@ -41,8 +41,16 @@ public final class BoardNetwork{
   var session=new Session(p.getServerWorld(),root.toImmutable(),UUID.randomUUID());sessions.put(p,session);PhotoTransfer.opened(p);
   var store=Store.get(p.getServer());if(store.error!=null){sessions.remove(p);p.sendMessage(Text.translatable("story.whiteout.request_denied"));return;}
   var state=LobbyState.get(store);
+  var test=dev.whiteout.power.DuoTestMode.active(p);
   Party.send(p,session.token);
-  ServerPlayNetworking.send(p,new View(session.token,state==null?0:state.revision(),p.isCreative()&&p.hasPermissionLevel(2),state!=null&&state.started(),state==null?null:state.card(),JSON.toJson(state==null?List.of():state.photos())));
+  // A virtual Duo lobby must have a visible card without altering the real world's card.
+  LobbyState.Card card=test==null?(state==null?null:state.card()):new LobbyState.Card(
+   "DUO TEST / WHITEOUT","Изолированный тест сюжета с виртуальным напарником.",
+   "WHITEOUT QA","Тестовый прогон","Команды: /whiteout test-duo");
+  ServerPlayNetworking.send(p,new View(session.token,state==null?0:state.revision(),
+   test==null&&p.isCreative()&&p.hasPermissionLevel(2),
+   test==null?state!=null&&state.started():test.started(),card,
+   JSON.toJson(test==null&&state!=null?state.photos():List.of())));
  }
  static boolean access(ServerPlayerEntity p,UUID token,boolean editor){
   var s=sessions.get(p);return s!=null&&s.token.equals(token)&&valid(p,s)&&(!editor||dev.whiteout.power.DuoTestMode.active(p)==null&&p.isCreative()&&p.hasPermissionLevel(2));
