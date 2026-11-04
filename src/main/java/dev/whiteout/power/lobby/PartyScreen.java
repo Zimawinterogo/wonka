@@ -60,7 +60,7 @@ final class PartyScreen extends SharpScreen{
  @Override public void render(DrawContext d,int mx,int my,float dt){
   int x=width/2-142,y=height/2-85;d.fill(0,0,width,height,0xf333291f);d.fill(x-8,y-15,x+292,y+171,0xffd8c9a6);
   if(tab==1){String[] labels={"Измерение","X","Y","Z","Событие"};for(int i=0;i<5;i++)d.drawText(textRenderer,labels[i],x,y+6+i*23,0x382c20,false);d.drawText(textRenderer,error,x,y+168,0x97433b,false);}
-  else if(tab==2)d.drawText(textRenderer,"Общая сложность · "+(state.balance()==null?"по миру":state.balance().preset()),x+12,y+4,0x382c20,false);
+  else if(tab==2)d.drawText(textRenderer,"Общая сложность · "+(state.balance()==null?"по миру":state.balance().label()),x+12,y+4,0x382c20,false);
   else if(tab==3){for(int i=0;i<9;i++)d.drawText(textRenderer,labels[i],x+(i/5)*144,y+23+(i%5)*22,0x382c20,false);d.drawText(textRenderer,error,x,y+128,0x904533,false);}
   else if(state!=null){d.drawText(textRenderer,state.host()==null?"Solo · пригласите игрока для Duo":"№1 · "+name(state.host()),x+8,y,0x382c20,false);
    if(state.partner()!=null)d.drawText(textRenderer,"№2 · "+name(state.partner())+"  |  Готовность: "+((state.mine()?1:0)+(state.other()?1:0))+"/2",x+8,y+16,0x382c20,false);

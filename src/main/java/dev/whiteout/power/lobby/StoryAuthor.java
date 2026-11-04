@@ -28,7 +28,7 @@ public final class StoryAuthor{
    long now=System.nanoTime();if(now-recent.getOrDefault(p,now-1000000000L)<150000000L)return;recent.put(p,now);
    try{
     var path=c.server().getSavePath(WorldSavePath.ROOT).resolve("whiteout-story-events.json");
-    var response=update(path,m);if(!m.body.isEmpty())StoryAuthority.reload(c.server());ServerPlayNetworking.send(p,response);
+    var response=update(path,m);if(!m.body.isEmpty()){StoryAuthority.reload(c.server());Party.contentChanged(c.server());}ServerPlayNetworking.send(p,response);
    }catch(Exception ex){String msg=Objects.toString(ex.getMessage(),"Ошибка определения");ServerPlayNetworking.send(p,new Page(m.token,m.key,m.revision,"",msg.substring(0,Math.min(150,msg.length()))));}
   }));
  }

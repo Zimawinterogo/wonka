@@ -54,6 +54,7 @@ public record LobbyState(Card card,UUID first,UUID second,boolean started,long r
  }
  public static void resetLaunch(Store store)throws java.io.IOException{
   var old=get(store);if(old==null||!old.started)throw new IllegalStateException("not started");
+  if(((dev.whiteout.power.SharedScene.Access)(Object)store.data).whiteout$scene()!=null)throw new IllegalStateException("scene still running");
   save(store,old,old.change(null,null,false,old.photos,old.start));
  }
  public static final String STARTED="whiteout:lobby_started";

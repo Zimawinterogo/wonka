@@ -105,7 +105,7 @@ public final class BoardScreen extends SharpScreen {
    var party=PartyScreen.state;if(party!=null){
     String mode=party.partner()!=null?"Duo · "+((party.mine()?1:0)+(party.other()?1:0))+"/2":party.invited()!=null?"Ожидание ответа":"Solo";
     d.drawText(textRenderer,mode,right+5,y+65,0x493d2d,false);
-    d.drawText(textRenderer,party.balance()==null?"По миру":party.balance().preset(),right+5,y+109,0x493d2d,false);
+    d.drawText(textRenderer,party.balance()==null?"По миру":party.balance().label(),right+5,y+109,0x493d2d,false);
    }
   }
   super.render(d,mx,my,dt);

@@ -55,9 +55,10 @@ public final class Party {
   UUID a=d==null?null:d.first(),b=d==null?null:d.second(),id=p.getUuid();
   var list=s.getPlayerManager().getPlayerList().stream().limit(128).map(q->new Person(q.getUuid(),q.getGameProfile().getName())).toList();
   boolean start=d!=null&&!d.started()&&(a==null||id.equals(a))&&(b==null?v.invite==null:v.ready.containsAll(List.of(a,b))&&online(s,b)!=null);
-  var status=new Status(d==null?0:d.revision(),d!=null&&d.started(),a,b,v.invite,v.ready.contains(id),v.ready.contains(id.equals(a)?b:a),start,list,p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ(),d==null?null:d.start(),Balance.get(Store.get(s).data));
+  var status=new Status(d==null?0:d.revision(),d!=null&&d.started(),a,b,v.invite,v.ready.contains(id),v.ready.contains(id.equals(a)?b:a),start,list,p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ(),d==null||!p.isCreative()||!p.hasPermissionLevel(2)?null:d.start(),Balance.get(Store.get(s).data));
   ServerPlayNetworking.send(p,new Info(token,BoardNetwork.JSON.toJson(status)));
  }
+ static void contentChanged(MinecraftServer server){var state=LobbyState.get(Store.get(server));if(state!=null&&!state.started()){session(server,state).ready.clear();BoardNetwork.notifyParty(server);}}
  private static void require(boolean ok){if(!ok)throw new IllegalStateException("Action unavailable");}
  private static ServerWorld destination(MinecraftServer s,LobbyState.Start cfg){
   if(cfg==null||cfg.dimension()==null)return null;
@@ -66,7 +67,7 @@ public final class Party {
  }
  private static StoryEventCatalog.Event event(MinecraftServer s,LobbyState.Start cfg){
   if(cfg==null||cfg.event()==null)return null;var event=StoryAuthority.definition(s,cfg.event());
-  require(event.serverOnly()&&event.once()&&event.scope()==ScopedStory.Scope.WORLD&&event.trigger()==null);
+  require(event.serverOnly()&&event.once()&&event.scope()==ScopedStory.Scope.WORLD&&event.trigger()==null&&event.narrative()==null);
   return event;
  }
  private record Origin(ServerPlayerEntity p,ServerWorld w,double x,double y,double z,float yaw,float pitch){

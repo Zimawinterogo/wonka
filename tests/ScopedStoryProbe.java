@@ -46,6 +46,12 @@ public class ScopedStoryProbe {
     "actions":[{"variable":"step","operation":"SET","value":{"type":"INT","integer":3}}]}
     """,StoryEventCatalog.Event.class);
    var pos=new ScopedStory.Position("minecraft:overworld",5,70,5,0,0);
+   var example=Path.of("../../docs/examples/duo-final-events.json");var catalog=new StoryEventCatalog(example);
+   check(!catalog.invalid()&&catalog.find("dialogue_choice:final_second:0:1").narrative().endings().size()==2,"three authored outcomes: "+catalog.error());
+   var bad=dir.resolve("bad.json");Files.writeString(bad,Files.readString(example).replace("\"SECRET\"","\"SECRT\""));
+   check(new StoryEventCatalog(bad).invalid(),"invalid visibility cannot become shared");
+   Files.writeString(bad,Files.readString(example).replace("\"completion\": \"whiteout:example/letter_exit\"","\"completion\": \"does_not_exist\""));
+   check(new StoryEventCatalog(bad).invalid(),"missing cinematic exit rejected");
    var token=UUID.randomUUID();
    var assembly=new dev.whiteout.power.lobby.PhotoTransfer.Assembly(token,7,2);
    var pixels=new byte[dev.whiteout.power.lobby.PhotoTransfer.CHUNK];

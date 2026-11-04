@@ -1,0 +1,261 @@
+{
+  "schema": 4,
+  "events": [
+    {
+      "key": "dialogue_choice:letter:0:0",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "scope": "PLAYER",
+      "trigger": {
+        "type": "CHOICE"
+      },
+      "narrative": {
+        "mode": "DUO",
+        "actor": "SECOND",
+        "recipient": "SECOND",
+        "visibility": "SECRET"
+      }
+    },
+    {
+      "key": "cutscene_trigger:letter_area",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "box": {
+          "x1": -15,
+          "y1": 62,
+          "z1": 0,
+          "x2": -9,
+          "y2": 67,
+          "z2": 6
+        }
+      },
+      "conditions": [],
+      "actions": [],
+      "scope": "PLAYER",
+      "trigger": {
+        "type": "ENTER_BOX",
+        "nextChoices": [
+          "dialogue_choice:letter:0:0"
+        ]
+      },
+      "narrative": {
+        "mode": "DUO",
+        "actor": "SECOND",
+        "recipient": "SECOND",
+        "visibility": "SECRET",
+        "secondDialogue": "letter"
+      }
+    },
+    {
+      "key": "cutscene_trigger:final_meeting",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "box": {
+          "x1": -3,
+          "y1": 62,
+          "z1": -3,
+          "x2": 4,
+          "y2": 67,
+          "z2": 4
+        }
+      },
+      "conditions": [],
+      "actions": [],
+      "trigger": {
+        "type": "ENTER_BOX",
+        "nextChoices": [
+          "dialogue_choice:final_second:0:0",
+          "dialogue_choice:final_second:0:1"
+        ]
+      },
+      "narrative": {
+        "mode": "DUO",
+        "together": true,
+        "firstDialogue": "final_first",
+        "secondDialogue": "final_second",
+        "waitForReaders": true
+      }
+    },
+    {
+      "key": "dialogue_choice:final_second:0:0",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "trigger": {
+        "type": "CHOICE"
+      },
+      "narrative": {
+        "mode": "DUO",
+        "actor": "SECOND",
+        "endings": [
+          {
+            "id": "loss",
+            "title": "Последний выстрел",
+            "priority": 1,
+            "when": [],
+            "event": "whiteout:example/loss",
+            "finale": {
+              "scene": "final_loss",
+              "ticks": 160,
+              "completion": "whiteout:example/loss_exit"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "dialogue_choice:final_second:0:1",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "trigger": {
+        "type": "CHOICE"
+      },
+      "narrative": {
+        "mode": "DUO",
+        "actor": "SECOND",
+        "endings": [
+          {
+            "id": "mercy",
+            "title": "Возвращение",
+            "priority": 1,
+            "when": [],
+            "event": "whiteout:example/mercy",
+            "finale": {
+              "scene": "final_mercy",
+              "ticks": 160,
+              "completion": "whiteout:example/mercy_exit"
+            }
+          },
+          {
+            "id": "letter",
+            "title": "Непрочитанное письмо",
+            "priority": 2,
+            "when": [
+              {
+                "source": "SECOND",
+                "completed": [
+                  "dialogue_choice:letter:0:0"
+                ]
+              }
+            ],
+            "event": "whiteout:example/letter",
+            "finale": {
+              "scene": "final_letter",
+              "ticks": 160,
+              "completion": "whiteout:example/letter_exit"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "whiteout:example/loss",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "serverOnly": true
+    },
+    {
+      "key": "whiteout:example/loss_exit",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "serverOnly": true
+    },
+    {
+      "key": "whiteout:example/mercy",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "serverOnly": true
+    },
+    {
+      "key": "whiteout:example/mercy_exit",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "serverOnly": true
+    },
+    {
+      "key": "whiteout:example/letter",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "serverOnly": true
+    },
+    {
+      "key": "whiteout:example/letter_exit",
+      "once": true,
+      "area": {
+        "dimension": "minecraft:overworld",
+        "x": 0,
+        "y": 64,
+        "z": 0,
+        "radius": 16
+      },
+      "conditions": [],
+      "actions": [],
+      "serverOnly": true
+    }
+  ]
+}

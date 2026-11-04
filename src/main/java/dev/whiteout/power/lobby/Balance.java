@@ -17,6 +17,7 @@ public record Balance(String preset,int newFuel,int oldFuel,int lampMinutes,int 
   case "normal"->new Balance(id,100,100,7,15,20,10,8,240,360);
   case "hard"->new Balance(id,150,170,4,25,10,18,7,160,240);
   default->throw new IllegalArgumentException("preset");};}
+ public String label(){return switch(preset){case "easy"->"Лёгкая";case "normal"->"Нормальная";case "hard"->"Сложная";default->"Своя";};}
  public static Balance get(Store.Data data){return (Object)data instanceof Access a?a.whiteout$balance():null;}
  public static Balance get(World world){return world==null||world.getServer()==null?null:get(Store.get(world.getServer()).data);}
  static void set(Store store,Balance value)throws java.io.IOException{
