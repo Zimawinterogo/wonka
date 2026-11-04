@@ -46,6 +46,7 @@ public final class PowerClient implements ClientModInitializer {
 
  @Override public void onInitializeClient(){
   StoryAuthorityClient.register();
+  MigratedTriggerClient.register();
   EditorClient.initialize();
   ZoneSettingsScreen.initialize();
   dev.whiteout.power.backpack.BackpackClient.initialize();

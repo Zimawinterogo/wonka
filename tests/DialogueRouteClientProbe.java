@@ -15,6 +15,7 @@ public class DialogueRouteClientProbe {
   registry.remove(script.id());
   var runtime=dev.whiteout.client.StoryRuntime.class;
   if(Arrays.stream(runtime.getDeclaredMethods()).noneMatch(m->m.getName().contains("authorizedFire")))throw new AssertionError("StoryRuntime authority Mixin absent");
+  if(Arrays.stream(dev.whiteout.client.director.DirectorTriggerManager.class.getDeclaredMethods()).noneMatch(m->m.getName().contains("serverManaged")))throw new AssertionError("Migrated trigger guard absent");
   if(Arrays.stream(dev.whiteout.client.DialogueScreen.class.getDeclaredMethods()).noneMatch(m->m.getName().contains("awaitChoice")))throw new AssertionError("Dialogue choice redirect absent");
   if(dev.whiteout.client.StoryRuntime.commit("unapproved",true,List.of(),List.of()))throw new AssertionError("speculative commit survived");
   var trigger=new dev.whiteout.client.director.DirectorTriggerManager.Trigger();

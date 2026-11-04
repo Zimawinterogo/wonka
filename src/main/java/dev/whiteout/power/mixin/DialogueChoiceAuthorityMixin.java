@@ -13,6 +13,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value=DialogueScreen.class,remap=false)
 public abstract class DialogueChoiceAuthorityMixin {
  @Unique private int whiteout$choiceIndex;
+ @Shadow private String choiceKey(int index){throw new AssertionError();}
+ @Redirect(method="choose",at=@At(value="INVOKE",target="Ldev/whiteout/client/DialogueManager$Choice;once()Z"),remap=false)
+ private boolean whiteout$requiresConfirmation(DialogueManager.Choice choice){
+  return choice.once()||dev.whiteout.power.MigratedTriggerClient.managed(choiceKey(whiteout$choiceIndex));
+ }
+ @Redirect(method="choose",at=@At(value="INVOKE",target="Ldev/whiteout/client/StoryEffects;preflight(Ljava/util/List;)Z"),remap=false)
+ private boolean whiteout$preflight(List<StoryEffects.Effect> effects){
+  return StoryEffects.preflight(dev.whiteout.power.MigratedTriggerClient.managed(choiceKey(whiteout$choiceIndex))
+   ?dev.whiteout.power.MigratedTriggerClient.presentation(effects):effects);
+ }
  @Shadow private DialogueManager.Line currentLine(){throw new AssertionError();}
  @Shadow private void logCurrentLine(){throw new AssertionError();}
  @Shadow private void showPlayerReply(DialogueManager.Line line,String text){throw new AssertionError();}
@@ -26,11 +36,17 @@ public abstract class DialogueChoiceAuthorityMixin {
  private boolean whiteout$awaitChoice(String key,boolean once,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions){
   var line=currentLine();var choice=line.choices().get(whiteout$choiceIndex);var mc=MinecraftClient.getInstance();
   StoryAuthorityClient.request(key,()->mc.currentScreen==(Object)this&&currentLine()==line,()->true,()->{
-   if(!StoryEffects.preflight(choice.effects()))return false;
+   boolean migrated=dev.whiteout.power.MigratedTriggerClient.managed(key);
+   var effects=migrated?dev.whiteout.power.MigratedTriggerClient.presentation(choice.effects()):choice.effects();
+   if(!StoryEffects.preflight(effects))return false;
    logCurrentLine();showPlayerReply(line,choice.text());
-   boolean blocking=StoryEffects.hasBlocking(choice.effects());
-   if(!choice.effects().isEmpty()&&!StoryEffects.run(choice.effects()))return false;
-   if(!blocking)executeReply(choice.command(),choice.dialogue(),choice.next());return true;
+   boolean blocking=StoryEffects.hasBlocking(effects);
+   if(!effects.isEmpty()&&!StoryEffects.run(effects))return false;
+   if(!blocking){
+    if(migrated&&choice.command()!=null&&choice.command().regionMatches(true,0,"director_signal:",0,16)){mc.setScreen(null);return true;}
+    executeReply(migrated?"":choice.command(),choice.dialogue(),choice.next());
+   }
+   return true;
   },null);
   return false;
  }

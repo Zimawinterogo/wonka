@@ -8,6 +8,7 @@ import json
 import math
 from pathlib import Path
 import re
+from uuid import UUID
 
 
 def read_json(path):
@@ -17,64 +18,128 @@ def read_json(path):
                       parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
 
 
-def convert(data, scenes=None):
+def convert(data, scenes=None, dialogues=None):
     if not isinstance(data, dict) or not isinstance(data.get('triggers'), list):
-        raise ValueError('Expected an object containing triggers[]')
-    events, keys = [], set()
+        raise ValueError('Expected triggers[]')
+    events = {}
+
+    def add(key, source, binding):
+        if len(events) >= 128 or not re.fullmatch(r'[a-zA-Z0-9_.:/-]{1,128}', key):
+            raise ValueError(f'Invalid or excessive event: {key}')
+        once = source.get('once', False)
+        if type(once) is not bool:
+            raise ValueError(f'{key}: invalid once')
+        event = dict(key=key, once=once, trigger=binding)
+        for field in ('conditions', 'actions'):
+            rules = source.get(field, [])
+            if not isinstance(rules, list) or any(not isinstance(r, dict) for r in rules):
+                raise ValueError(f'{key}: invalid {field}')
+            event[field] = rules
+        events[key] = event
+        return event
+
+    def scene_dialogue(scene):
+        if not isinstance(scene, str) or not re.fullmatch(r'[a-zA-Z0-9_-]+', scene) or scenes is None:
+            raise ValueError('Scene directory and safe scene id required')
+        doc = read_json(Path(scenes) / (scene + '.json'))
+        lines = doc.get('events', [])
+        if doc.get('id') != scene or len(lines) != 1 or lines[0].get('type') != 'DIALOGUE':
+            raise ValueError(f'{scene}: review cinematic events manually')
+        return lines[0]['value']
+
+    def effects(event, source):
+        script = None
+        for effect in source.get('effects', []):
+            kind = effect['type']
+            if kind in ('RADIO', 'SOUND'):
+                continue
+            if kind in ('SCENE', 'DIALOGUE') and script is None:
+                script = scene_dialogue(effect['target']) if kind == 'SCENE' else effect['target']
+            elif kind in ('OBJECTIVE_START', 'OBJECTIVE_UPDATE', 'OBJECTIVE_FAIL', 'OBJECTIVE_COMPLETE'):
+                event.setdefault('objectives', []).append(dict(id=effect['target'], event=kind[10:], text=effect.get('text', '')))
+            else:
+                raise ValueError(f'Unsupported effect combination: {kind}')
+        return script
+
+    def branch(script, index=0):
+        if not isinstance(dialogues, dict) or script not in dialogues.get('dialogues', {}):
+            raise ValueError(f'--dialogues must contain {script}')
+        lines = dialogues['dialogues'][script]['lines']
+        while 0 <= index < len(lines):
+            line = lines[index]
+            if line.get('auto_reply') or line.get('prewritten_reply'):
+                raise ValueError(f'{script}:{index}: review automatic reply manually')
+            choices = line.get('choices', [])
+            if not choices:
+                index += 1
+                continue
+            keys = [f'dialogue_choice:{script}:{index}:{i}' for i in range(len(choices))]
+            if keys[0] in events:
+                return keys
+            for key, choice in zip(keys, choices):
+                add(key, choice, dict(type='CHOICE'))
+            for key, choice in zip(keys, choices):
+                binding = events[key]['trigger']
+                opened = effects(events[key], choice)
+                command = choice.get('command', '')
+                if command:
+                    if opened or not command.lower().startswith('director_signal:') or not command[16:].strip():
+                        raise ValueError(f'{key}: unsupported command')
+                    binding['emit'] = command[16:].strip()
+                elif opened or choice.get('dialogue'):
+                    binding['nextChoices'] = branch(opened or choice['dialogue'])
+                else:
+                    dest = choice.get('next', -1)
+                    binding['nextChoices'] = branch(script, index + 1 if dest < 0 else dest)
+            return keys
+        return []
+
     for trigger in data['triggers']:
-        if not isinstance(trigger, dict):
-            raise ValueError('Invalid trigger')
         if trigger.get('enabled') is False:
             continue
-        if trigger.get('enabled') is not True:
-            raise ValueError('Explicit enabled flag required')
-        ident = trigger.get('id')
-        if not isinstance(ident, str) or not re.fullmatch(r'[a-zA-Z0-9_.:/-]{1,111}', ident):
-            raise ValueError('Invalid trigger id')
-        key = 'cutscene_trigger:' + ident
-        if key in keys:
-            raise ValueError(f'{ident}: duplicate key')
-        keys.add(key)
-        if trigger.get('type') != 'ENTER_BOX' or trigger.get('delayTicks', 0) != 0:
-            raise ValueError(f'{ident}: only immediate ENTER_BOX is supported')
-        if trigger.get('effects', []) != []:
-            raise ValueError(f'{ident}: effects require a server scenario; migration refused')
-        scene_id = trigger.get('sceneId', '')
-        if scene_id:
-            if not isinstance(scene_id, str) or not re.fullmatch(r'wdlg_[a-zA-Z0-9_-]+', scene_id) or scenes is None:
-                raise ValueError(f'{ident}: a verified generated dialogue scene is required')
-            scene = read_json(Path(scenes) / (scene_id + '.json'))
-            content = scene.get('events') if isinstance(scene, dict) else None
-            if (not isinstance(scene, dict) or scene.get('id') != scene_id or not isinstance(content, list) or len(content) != 1
-                    or not isinstance(content[0], dict) or content[0].get('type') != 'DIALOGUE'
-                    or not isinstance(content[0].get('value'), str) or not content[0]['value']):
-                raise ValueError(f'{ident}: scene is not a generated dialogue-only scene')
-        dimension = trigger.get('dimension')
-        if not isinstance(dimension, str) or len(dimension) > 128 or not re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9/._-]+', dimension):
-            raise ValueError(f'{ident}: invalid dimension')
-        box = {}
-        for axis in 'xyz':
-            a, b = trigger.get(axis + '1'), trigger.get(axis + '2')
-            if any(type(v) not in (int, float) or not math.isfinite(v) for v in (a, b)):
-                raise ValueError(f'{ident}: invalid {axis} bounds')
-            lo, hi = min(a, b), max(a, b) + 1
-            limit = 2048 if axis == 'y' else 30000000
-            if hi - lo > 256 or lo >= hi or abs(lo) > limit or abs(hi) > limit:
-                raise ValueError(f'{ident}: {axis} bounds exceed catalog limits')
-            box[axis + '1'], box[axis + '2'] = lo, hi
-        if type(trigger.get('once')) is not bool:
-            raise ValueError(f'{ident}: explicit once flag required')
-        rules = {}
-        for name in ('conditions', 'actions'):
-            value = trigger.get(name, [])
-            if not isinstance(value, list) or any(not isinstance(rule, dict) for rule in value):
-                raise ValueError(f'{ident}: invalid {name}')
-            # Preserve author data verbatim; the production StoryRules validator remains final.
-            rules[name] = value
-        events.append(dict(key=key, once=trigger['once'], area=dict(dimension=dimension, box=box), **rules))
-    if len(events) > 128:
-        raise ValueError('More than 128 enabled events')
-    return dict(schema=1, events=events)
+        if trigger.get('enabled') is not True or type(trigger.get('once')) is not bool:
+            raise ValueError('Explicit enabled and once flags required')
+        key = 'cutscene_trigger:' + trigger['id']
+        if key in events or not trigger['id']:
+            raise ValueError(f'Duplicate or empty trigger: {key}')
+        kind, delay = trigger.get('type'), trigger.get('delayTicks', 0)
+        if type(delay) is not int or not 0 <= delay <= 72000:
+            raise ValueError(f'{key}: invalid delay')
+        binding = dict(type=kind, delayTicks=delay)
+        event = add(key, trigger, binding)
+        if kind in ('ENTER_BOX', 'EXIT_BOX'):
+            dimension = trigger.get('dimension', '')
+            if len(dimension) > 128 or not re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9/._-]+', dimension):
+                raise ValueError(f'{key}: invalid dimension')
+            box = {}
+            for axis in 'xyz':
+                a, b = trigger.get(axis + '1'), trigger.get(axis + '2')
+                if any(type(v) not in (int, float) or not math.isfinite(v) for v in (a, b)):
+                    raise ValueError(f'{key}: invalid bounds')
+                lo, hi = sorted((math.floor(a), math.floor(b)))
+                hi += 3 if axis == 'y' and lo == hi else 1
+                limit = 2048 if axis == 'y' else 30000000
+                if hi - lo > 256 or max(abs(lo), abs(hi)) > limit:
+                    raise ValueError(f'{key}: bounds exceed catalog limits')
+                box[axis + '1'], box[axis + '2'] = lo, hi
+            event['area'] = dict(dimension=dimension, box=box)
+        elif kind in ('SIGNAL', 'INTERACT_ENTITY'):
+            target = trigger.get('target', '')
+            if not target.strip() or len(target) > 128:
+                raise ValueError(f'{key}: named target required')
+            if kind == 'INTERACT_ENTITY' and str(UUID(target)) != target.lower():
+                raise ValueError(f'{key}: expected NPC UUID')
+            binding['target'] = target
+        else:
+            raise ValueError(f'{key}: unknown trigger type')
+        script = effects(event, trigger)
+        if trigger.get('sceneId'):
+            if script:
+                raise ValueError(f'{key}: overlapping presentations')
+            script = scene_dialogue(trigger['sceneId'])
+        if script:
+            binding['nextChoices'] = branch(script)
+    return dict(schema=2, events=list(events.values()))
 
 
 def main(argv=None):
@@ -82,9 +147,11 @@ def main(argv=None):
     parser.add_argument('triggers', type=Path)
     parser.add_argument('--scenes', type=Path, help='Directory containing generated wdlg_*.json scenes')
     parser.add_argument('--output', type=Path, help='Create a NEW candidate file; otherwise print a preview')
+    parser.add_argument('--dialogues', type=Path, help='Legacy dialogue definitions referenced by these triggers')
     args = parser.parse_args(argv)
     try:
-        result = json.dumps(convert(read_json(args.triggers), args.scenes), ensure_ascii=False, indent=2, allow_nan=False) + '\n'
+        dialogues = read_json(args.dialogues) if args.dialogues else None
+        result = json.dumps(convert(read_json(args.triggers), args.scenes, dialogues), ensure_ascii=False, indent=2, allow_nan=False) + '\n'
         if len(result.encode('utf-8')) > 262144:
             raise ValueError('Catalog exceeds 256 KiB')
         if args.output:
@@ -92,7 +159,7 @@ def main(argv=None):
                 target.write(result)
         else:
             print(result, end='')
-    except (ValueError, OSError) as failure:
+    except (ValueError, OSError, TypeError, AttributeError, KeyError, IndexError, OverflowError, RecursionError) as failure:
         parser.exit(2, f'Migration refused: {failure}\n')
 
 

@@ -25,6 +25,7 @@ public final class StoryAuthority {
  public static void register(){
   if(registered)return;registered=true;
   StoryAuthorityNetwork.register();
+  TriggerAuthority.register();
   ServerPlayConnectionEvents.DISCONNECT.register((h,s)->{BUDGETS.remove(h.getPlayer());WARNINGS.remove(h.getPlayer());});
   ServerLifecycleEvents.SERVER_STOPPED.register(s->{CATALOGS.remove(s);BUDGETS.clear();WARNINGS.clear();});
   CommandRegistrationCallback.EVENT.register((dispatcher,registry,environment)->dispatcher.register(literal("whiteout")
@@ -38,7 +39,7 @@ public final class StoryAuthority {
      c.getSource().sendFeedback(()->Text.literal("Story authority reloaded: events="+catalog.size()+", invalid="+catalog.invalid()),false);return catalog.invalid()?0:1;
     })))));
  }
- private static StoryEventCatalog catalog(MinecraftServer server){
+ static StoryEventCatalog catalog(MinecraftServer server){
   return CATALOGS.computeIfAbsent(server,s->new StoryEventCatalog(s.getSavePath(WorldSavePath.ROOT).resolve("whiteout-story-events.json")));
  }
  public static StoryEventCatalog.Event definition(MinecraftServer server,String key){
@@ -67,7 +68,7 @@ public final class StoryAuthority {
   if(!BUDGETS.computeIfAbsent(player,p->new StoryRequestPolicy.Budget()).take(tick))return false;
   try{
    StoryEventCatalog.Event event=catalog(player.getServer()).resolve(packet.data());
-   execute(player,event.key());
+   if(event.trigger()==null)execute(player,event.key());
   }catch(Exception failure){denied(player,failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage());}
   return false;
  }
@@ -81,10 +82,13 @@ public final class StoryAuthority {
    if(event==null)throw new IllegalArgumentException("unregistered story key");
    if(event.serverOnly())throw new IllegalArgumentException("event is server-only");
    for(var scene:event.scenes())if(!CrisisRuntime.requestable(player.getServer(),scene))throw new IllegalArgumentException("scene unavailable: "+scene.id());
-   if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
+   if(event.trigger()!=null){
+    if(!TriggerAuthority.permits(player,key))return StoryReceipts.Outcome.DENIED;
+   }else if(!event.area().contains(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ()))throw new IllegalArgumentException("outside event area");
    Store store=Store.get(player.getServer());
    if(StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,store.data))!=WinterCrisisConditions.Truth.TRUE)return StoryReceipts.Outcome.CONDITIONS_FALSE;
    var result=StoryCommitTransaction.apply(store,event);
+   if(result==StoryCommitTransaction.Result.COMMITTED&&event.trigger()!=null)TriggerAuthority.committed(player,key);
    // A delivery error does not turn a committed transaction into a rejected one.
    try{if(result==StoryCommitTransaction.Result.COMMITTED)WhiteoutNetwork.syncAll(player.getServer());else WhiteoutNetwork.sync(player);}
    catch(RuntimeException failure){LOG.warn("Story state committed/read but snapshot delivery failed",failure);}

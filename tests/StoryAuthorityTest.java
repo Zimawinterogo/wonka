@@ -22,6 +22,30 @@ public final class StoryAuthorityTest {
   var migrated=new StoryEventCatalog(Path.of("tests/fixtures/story-migration-catalog.json"));
   check(!migrated.invalid()&&migrated.size()==1,"migration output accepted by production catalog");
   var imported=migrated.find("cutscene_trigger:lake_gate");
+  var rule=migrated.rule(imported.key());
+  var tracker=new TriggerEvidence();
+  var inside=new TriggerEvidence.Body("minecraft:overworld",9.9,70,0,10.1,72,1);
+  var outside=new TriggerEvidence.Body("minecraft:overworld",9,70,0,10,72,1);
+  var offers=new ArrayList<String>();
+  var delayed=new TriggerEvidence.Rule(rule.key(),rule.area(),new TriggerEvidence.Binding(TriggerEvidence.Kind.ENTER_BOX,2,null,List.of("dialogue_choice:a:0:0","dialogue_choice:a:0:1"),null));
+  tracker.observe(delayed,inside,0,k->true,offers::add);
+  check(offers.isEmpty(),"join inside is not a crossing");
+  tracker.observe(delayed,outside,1,k->true,offers::add);
+  tracker.observe(delayed,inside,2,k->true,offers::add);
+  tracker.observe(delayed,outside,3,k->true,offers::add);
+  tracker.observe(delayed,inside,4,k->true,offers::add);
+  tracker.observe(delayed,inside,5,k->true,offers::add);
+  check(!tracker.permits(delayed,5),"early or cancelled crossing");
+  tracker.observe(delayed,inside,6,k->true,offers::add);
+  tracker.observe(delayed,inside,7,k->true,offers::add);
+  check(offers.size()==1&&tracker.permits(delayed,7),"single mature crossing");
+  tracker.consume(delayed,7);
+  var choice=new TriggerEvidence.Binding(TriggerEvidence.Kind.CHOICE,0,null,List.of(),null);
+  var left=new TriggerEvidence.Rule("dialogue_choice:a:0:0",null,choice);
+  var right=new TriggerEvidence.Rule("dialogue_choice:a:0:1",null,choice);
+  check(!tracker.permits(delayed,7)&&tracker.permits(left,8)&&tracker.permits(right,8),"only earned branches");
+  tracker.consume(left,8);
+  check(!tracker.permits(right,8)&&!new TriggerEvidence().permits(left,8),"sibling and reconnect denied");
   check(imported.area().contains("minecraft:overworld",10,70,-2)&&!imported.area().contains("minecraft:overworld",13,70,-2),"migrated box deserialized correctly");
   check(StoryCommitTransaction.apply(Map.of("chapter",StoryRules.Value.of(1)),Set.of(),imported,
    (v,c)->check(v.get("gate_seen").bool&&c.contains(imported.key()),"migrated rules execute and retain once"))==StoryCommitTransaction.Result.COMMITTED,"migrated transaction");
@@ -71,7 +95,7 @@ public final class StoryAuthorityTest {
    Map<String,StoryRules.Value> reloadedVariables=JSON.fromJson(JSON.toJson(variables),new com.google.gson.reflect.TypeToken<Map<String,StoryRules.Value>>(){}.getType());
    Set<String> reloadedCompleted=new HashSet<>(Arrays.asList(JSON.fromJson(JSON.toJson(completed),String[].class)));
    check(StoryCommitTransaction.apply(reloadedVariables,reloadedCompleted,new StoryEventCatalog(path).find(event.key()),write)==StoryCommitTransaction.Result.ALREADY_COMPLETED,"restart keeps existing once keys");
-   for(String invalid:List.of("{broken","null","{\"schema\":2,\"events\":[]}",JSON.toJson(new StoryEventCatalog.Data(1,List.of(event,event))),json.replace("\"radius\":3.0","\"radius\":-1")," ".repeat(StoryEventCatalog.MAX_BYTES+1))){
+   for(String invalid:List.of("{broken","null","{\"schema\":3,\"events\":[]}",JSON.toJson(new StoryEventCatalog.Data(1,List.of(event,event))),json.replace("\"radius\":3.0","\"radius\":-1")," ".repeat(StoryEventCatalog.MAX_BYTES+1))){
     Files.writeString(path,invalid);var corrupt=new StoryEventCatalog(path);check(corrupt.invalid()&&corrupt.size()==0,"invalid catalog fails closed");check(Files.readString(path).equals(invalid),"invalid file preserved");
    }
   }finally{Files.deleteIfExists(path);Files.deleteIfExists(dir);}

@@ -22,8 +22,14 @@ assert event['conditions'] == trigger['conditions'] and event['actions'] == trig
 assert event['area']['box'] == dict(x1=10, x2=13, y1=70, y2=73, z1=-2, z2=3)
 assert data == dict(triggers=[trigger])
 assert migrate.convert(dict(triggers=[dict(trigger, enabled=False)]))['events'] == []
-for change in (dict(type='EXIT_BOX'), dict(type='SIGNAL'), dict(type='INTERACT_ENTITY'),
-               dict(delayTicks=1), dict(effects=[dict(type='COMMAND')]), dict(x1=float('nan')),
+exit_event = migrate.convert(dict(triggers=[dict(trigger, type='EXIT_BOX', delayTicks=7, y1=70.1, y2=70.9)]))['events'][0]
+assert exit_event['trigger'] == dict(type='EXIT_BOX', delayTicks=7)
+assert exit_event['area']['box']['y2'] == 73
+for kind, target in [('SIGNAL', 'ready'), ('INTERACT_ENTITY', 'ab3b9880-55fb-4351-9a19-25f348ab6057')]:
+    event = migrate.convert(dict(triggers=[dict(trigger, type=kind, target=target)]))['events'][0]
+    assert event['trigger']['target'] == target and 'area' not in event
+for change in (dict(type='SIGNAL'), dict(type='INTERACT_ENTITY'),
+               dict(delayTicks=-1), dict(effects=[dict(type='COMMAND')]), dict(x1=float('nan')),
                dict(x1=1000), dict(x1=True), dict(once=1), dict(enabled='true'),
                dict(sceneId='../bad'), dict(dimension='bad'), dict(actions=None)):
     try:
@@ -40,7 +46,14 @@ with tempfile.TemporaryDirectory() as folder:
     root = Path(folder)
     scene = dict(id='wdlg_lake', events=[dict(type='DIALOGUE', value='lake')])
     (root / 'wdlg_lake.json').write_text(json.dumps(scene), encoding='utf-8')
-    assert len(migrate.convert(dict(triggers=[dict(trigger, sceneId='wdlg_lake')]), root)['events']) == 1
+    dialogue = dict(dialogues=dict(lake=dict(lines=[dict(choices=[
+        dict(text='again', next=0), dict(text='done', once=True, command='director_signal:ready',
+            effects=[dict(type='OBJECTIVE_COMPLETE', target='find'), dict(type='SOUND', target='chime')])])])))
+    events = migrate.convert(dict(triggers=[dict(trigger, sceneId='wdlg_lake')]), root, dialogue)['events']
+    assert events[0]['trigger']['nextChoices'] == [e['key'] for e in events[1:]]
+    assert events[1]['trigger']['nextChoices'] == events[0]['trigger']['nextChoices']
+    assert events[2]['once'] and events[2]['trigger']['emit'] == 'ready'
+    assert events[2]['objectives'][0]['event'] == 'COMPLETE'
     source, output = root / 'triggers.json', root / 'candidate.json'
     source.write_text(json.dumps(data), encoding='utf-8')
     command = [sys.executable, '-X', 'utf8', str(tool), str(source), '--output', str(output)]

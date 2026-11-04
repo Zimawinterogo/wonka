@@ -34,33 +34,50 @@ public final class StoryEventCatalog {
    return this.dimension.equals(dimension)&&Double.isFinite(dx)&&Double.isFinite(dy)&&Double.isFinite(dz)&&dx*dx+dy*dy+dz*dz<=radius*radius;
   }
  }
- public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes){
+ public record Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes,TriggerEvidence.Binding trigger){
+  public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly,List<StorySceneActions.Change> scenes){this(key,once,area,conditions,actions,objectives,world,serverOnly,scenes,null);}
   public Event { objectives=objectives==null?List.of():List.copyOf(objectives);scenes=scenes==null?List.of():List.copyOf(scenes); }
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world,boolean serverOnly){this(key,once,area,conditions,actions,objectives,world,serverOnly,List.of());}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions){this(key,once,area,conditions,actions,List.of(),null,false);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives){this(key,once,area,conditions,actions,objectives,null,false);}
   public Event(String key,boolean once,Area area,List<StoryRules.Condition> conditions,List<StoryRules.Action> actions,List<StoryObjectiveActions.Change> objectives,StoryWorldConditions.Node world){this(key,once,area,conditions,actions,objectives,world,false);}
   public void validate(){
-   if(key==null||!key.matches("[a-zA-Z0-9_.:/-]{1,128}")||area==null||conditions==null||actions==null)throw new IllegalArgumentException("event");
-   area.validate();StoryRules.validate(conditions,actions);StoryObjectiveActions.validate(objectives);
+   if(key==null||!key.matches("[a-zA-Z0-9_.:/-]{1,128}")||(area==null&&trigger==null)||conditions==null||actions==null)throw new IllegalArgumentException("event");
+   if(trigger!=null){
+    if(serverOnly||trigger.zone()&&(area==null||area.box()==null))throw new IllegalArgumentException("invalid trigger binding");
+    String prefix=trigger.type()==TriggerEvidence.Kind.CHOICE?"dialogue_choice:":"cutscene_trigger:";
+    if(!key.startsWith(prefix))throw new IllegalArgumentException("inconsistent trigger key");
+   }
+   if(area!=null)area.validate();
+   StoryRules.validate(conditions,actions);StoryObjectiveActions.validate(objectives);
    if(world!=null)world.validate();
    StorySceneActions.validate(scenes);
   }
  }
  public record Data(int schema,List<Event> events){}
  private final Map<String,String> events=new LinkedHashMap<>();
+ private final Map<String,TriggerEvidence.Rule> rules=new LinkedHashMap<>();
+ public Collection<TriggerEvidence.Rule> rules(){return Collections.unmodifiableCollection(rules.values());}
+ public TriggerEvidence.Rule rule(String key){return rules.get(key);}
  private String error="";
  public StoryEventCatalog(Path path){
   if(!Files.exists(path))return;
   try{
    if(Files.size(path)>MAX_BYTES)throw new IOException("size");
    Data data=JSON.fromJson(Files.readString(path),Data.class);
-   if(data==null||data.schema()!=1||data.events()==null||data.events().size()>MAX_EVENTS)throw new IllegalArgumentException("schema/events");
+   if(data==null||(data.schema()!=1&&data.schema()!=2)||data.events()==null||data.events().size()>MAX_EVENTS)throw new IllegalArgumentException("schema/events");
    for(Event event:data.events()){
     if(event==null)throw new IllegalArgumentException("null event");event.validate();
     if(events.putIfAbsent(event.key(),JSON.toJson(event))!=null)throw new IllegalArgumentException("duplicate key");
+    if(event.trigger()!=null){
+     if(data.schema()!=2)throw new IllegalArgumentException("trigger bindings require schema 2");
+     rules.put(event.key(),new TriggerEvidence.Rule(event.key(),event.area(),event.trigger()));
+    }
    }
-  }catch(Exception failure){events.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
+   for(var rule:rules.values())for(String next:rule.binding().nextChoices()){
+    if(!rules.containsKey(next)||rules.get(next).binding().type()!=TriggerEvidence.Kind.CHOICE)throw new IllegalArgumentException("unknown choice: "+next);
+   }
+  }catch(Exception failure){events.clear();rules.clear();error=failure.getClass().getSimpleName()+": "+failure.getMessage();}
  }
  public boolean invalid(){return !error.isEmpty();}
  public String error(){return error;}
