@@ -49,7 +49,7 @@ public final class DuoTestMode {
  static ScopedStory.Position position(ServerPlayerEntity p){return new ScopedStory.Position(p.getServerWorld().getRegistryKey().getValue().toString(),p.getX(),p.getY(),p.getZ(),p.getYaw(),p.getPitch());}
  static boolean inside(StoryEventCatalog.Area area,ScopedStory.Position at){return area.contains(at.dimension(),at.x(),at.y(),at.z());}
  private static void need(boolean ok,String reason){if(!ok)throw new IllegalStateException(reason);}
- private static void tell(ServerPlayerEntity p,String line){p.sendMessage(Text.literal("[Duo Test] "+line));}
+ private static void tell(ServerPlayerEntity p,String line){if(Boolean.getBoolean("whiteout.testDuoTrace"))org.slf4j.LoggerFactory.getLogger("whiteout-test-duo").info("[{}] {}",p.getUuid(),line);p.sendMessage(Text.literal("[Duo Test] "+line));}
  public boolean started(){var d=LobbyState.get(store);return prepared&&d!=null&&d.started();}
  void roster(boolean launch)throws Exception{
   var access=(LobbyState.Access)(Object)store.data;var old=access.whiteout$lobby();
@@ -162,7 +162,7 @@ public final class DuoTestMode {
     evidence(who).observe(rule,body(at(who,p)),tick,k->eligible(p,who,e),k->{
      try{if(who.equals(BOT)){var outcome=act(p,who,k);if(outcome==StoryReceipts.Outcome.COMMITTED)tell(p,"Бот выполнил "+k);}
       else if(ServerPlayNetworking.canSend(p,TriggerAuthority.Notice.ID))ServerPlayNetworking.send(p,new TriggerAuthority.Notice(false,k));}
-     catch(Exception ex){tell(p,"Событие отклонено: "+k);}
+     catch(Exception ex){tell(p,"Событие отклонено: "+k+" · "+ex.getMessage());}
     });
    }
   }

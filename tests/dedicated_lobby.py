@@ -24,7 +24,7 @@ shutil.copy2(next((root / "build/release").glob("Whiteout-*.jar")), mods)
 (server / "server.properties").write_text("server-ip=127.0.0.1\nserver-port=0\nview-distance=2\nsimulation-distance=2\nlevel-seed=314159\n")
 
 def boot(first, test_duo=False):
-    process = subprocess.Popen(["java", "-Xmx2G", "-jar", "fabric-server-launch.jar", "nogui"], cwd=server, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    process = subprocess.Popen(["java", "-Dwhiteout.testDuoTrace=true", "-Xmx2G", "-jar", "fabric-server-launch.jar", "nogui"], cwd=server, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     lines = queue.Queue()
     def drain():
         for line in process.stdout:
@@ -48,7 +48,7 @@ def boot(first, test_duo=False):
         wait('For help, type "help"', 180)
         command("forceload add 0 0")
         if test_duo:
-            exercise_duo(command, wait)
+            exercise_duo(command, wait, test_duo == 'restart')
         elif first:
             command("tick freeze")
             command("fill 3 100 4 4 101 4 minecraft:stone")
@@ -79,7 +79,7 @@ def boot(first, test_duo=False):
             process.kill()
             process.wait()
 
-def exercise_duo(command, wait):
+def exercise_duo(command, wait, restart):
     name = "WoutQATester"
     command("forceload add -16 -16 16 16")
     command("fill -16 63 -4 15 63 7 minecraft:stone")
@@ -88,6 +88,8 @@ def exercise_duo(command, wait):
     wait("joined the game", 90)
     command(f"gamemode creative {name}")
     command("scoreboard objectives add qa dummy")
+    command("whiteout story-authority reload")
+    wait("invalid=false", 10)
     counter = 0
     def action(text, ok=True):
         nonlocal counter
@@ -95,13 +97,32 @@ def exercise_duo(command, wait):
         token = f"QA_RESULT_{counter}_OK"
         command(f"execute store result score result qa as {name} run whiteout test-duo {text}")
         command(f"execute if score result qa matches {int(ok)} run say {token}")
-        wait(token, 10)
+        try:
+            wait(token, 10)
+        except (queue.Empty, TimeoutError):
+            diagnostic = list((server/"world"/"whiteout-duo-tests").glob("*.json"))
+            if diagnostic:
+                print("Persisted test events:", json.loads(diagnostic[0].read_text()).get("completedEvents", []), flush=True)
+            raise AssertionError(f"Unexpected command result: {text}; expected {ok}")
     def move(x):
         command(f"tp {name} {x} 64 1")
         time.sleep(.5)
     def progress():
         path, = (server/"world"/"whiteout-duo-tests").glob("*.json")
         return json.loads(path.read_text())
+    if restart:
+        action("status", False)
+        command('execute unless entity @e[type=minecraft:armor_stand,name="Whiteout Test Bot"] run say QA_NO_ORPHAN')
+        wait("QA_NO_ORPHAN",10)
+        action("enable confirm")
+        action("start")
+        assert "whiteout:ending/letter" in progress()["completedEvents"]
+        action("stop")
+        action("disable")
+        for path in (server/"world").glob("whiteout-zones*.json"):
+            assert "whiteout:ending/letter" not in path.read_text(encoding="utf8")
+        print("PASS dedicated cold restart: development mode off, no orphan mannequin, explicit resume retains isolated ending", flush=True)
+        return
     command(f"op {name}")
     wait("server operator", 20)
     action("enable confirm")
@@ -117,6 +138,7 @@ def exercise_duo(command, wait):
         action("disconnect")
         action("choose dialogue_choice:final_second:0:0", False)
         action("reconnect")
+        time.sleep(1)
         if branch == "loss":
             move(8)
             action("self dialogue_choice:qa_vote:0:0")
@@ -161,6 +183,8 @@ def exercise_duo(command, wait):
             time.sleep(.5)
     action("disable")
     action("state", False)
+    action("enable confirm")
+    action("start")
     print("PASS dedicated Duo commands: isolation, readiness, movement, reconnect, three Once endings, unacknowledged camera recovery", flush=True)
 
 boot(True)
@@ -181,4 +205,5 @@ for key in options:
 with (server/"server.properties").open("a") as props:
     props.write("\nonline-mode=false\n")
 boot(False, test_duo=True)
+boot(False, test_duo="restart")
 print("PASS packaged Fabric dedicated lobby board survives restart and loses support correctly")

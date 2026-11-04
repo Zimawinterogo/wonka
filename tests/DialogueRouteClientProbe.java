@@ -21,6 +21,10 @@ public class DialogueRouteClientProbe {
   DialogueManager.load();dev.whiteout.client.director.DirectorLibrary.load();
   if(DialogueManager.findById("final_second").lines().getFirst().choices().size()!=2||DialogueManager.findById("letter")==null)throw new AssertionError("test replies not loaded");
   for(var id:List.of("loss","mercy","letter")){var clip=dev.whiteout.client.director.DirectorLibrary.get("final_"+id);if(clip==null||clip.camera.size()!=2||clip.durationTicks!=160)throw new AssertionError("test camera "+id);}
+  for(String invalid:List.of("missing_qa_camera 0","final_loss invalid")){
+   var id=UUID.randomUUID();var response=dev.whiteout.power.SharedSceneClient.loadResult(new dev.whiteout.power.DialogueBarrier.Cue(id,"scene",invalid));
+   if(!id.equals(response.id())||!response.kind().equals("load_error"))throw new AssertionError("missing explicit negative acknowledgement");
+  }
   var runtime=dev.whiteout.client.StoryRuntime.class;
   if(Arrays.stream(runtime.getDeclaredMethods()).noneMatch(m->m.getName().contains("authorizedFire")))throw new AssertionError("StoryRuntime authority Mixin absent");
   if(Arrays.stream(dev.whiteout.client.director.DirectorTriggerManager.class.getDeclaredMethods()).noneMatch(m->m.getName().contains("serverManaged")))throw new AssertionError("Migrated trigger guard absent");

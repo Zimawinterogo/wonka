@@ -44,6 +44,8 @@ public final class DuoTestProbe {
     check(reopened.started()&&SharedScene.current(reopened.store).spec().scene().equals("final_"+expected),"explicit resume");
     check(reopened.store.data.completedEvents.contains(Narrative.FINISHED)&&reopened.store.data.completedEvents.contains("whiteout:ending/"+expected),"durable ending");
    }
+   var retries=new PhotoTransfer.RetrySchedule();var due=new ArrayList<Integer>();for(int tick=1;tick<=1000;tick++)if(retries.due())due.add(tick);
+   check(due.equals(List.of(85,170,255)),"bounded retry schedule");
    Set<Integer> inFlight=new HashSet<>();check(!PhotoTransfer.reserve(inFlight,0,()->false)&&inFlight.isEmpty(),"rate limit does not consume slot");
    check(PhotoTransfer.reserve(inFlight,0,()->true)&&!PhotoTransfer.reserve(inFlight,0,()->true),"single transfer");
    inFlight.remove(0);check(PhotoTransfer.reserve(inFlight,0,()->true),"failed transfer can retry");

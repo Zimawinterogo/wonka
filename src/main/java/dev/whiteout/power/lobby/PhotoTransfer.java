@@ -36,6 +36,11 @@ public final class PhotoTransfer{
  }
  private static final Map<ServerPlayerEntity,Assembly> uploads=new WeakHashMap<>();
  private static final Map<ServerPlayerEntity,Long> gate=new WeakHashMap<>();
+ /** Opening a view sends the first request. Missing slots get three spaced retries. */
+ public static final class RetrySchedule{
+  private int attempts=1,ticks;
+  public boolean due(){if(attempts>=4||++ticks<85)return false;ticks=0;attempts++;return true;}
+ }
  public static boolean reserve(Set<Integer> inflight,int index,java.util.function.BooleanSupplier hasBudget){
   return !inflight.contains(index)&&hasBudget.getAsBoolean()&&inflight.add(index);
  }

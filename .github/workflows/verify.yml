@@ -32,6 +32,19 @@ jobs:
           python tools/private_music.py Whiteout-3.12.9-1.21.1.jar --compare build/release/Whiteout-3.13.0-1.21.1.jar
       - name: Boot and restart packaged Fabric dedicated server
         run: python -u tests/dedicated_lobby.py
+      - name: Package the optional single-player Duo test map configuration
+        run: |
+          mkdir -p build/duo-test-kit/world
+          cp -R docs/examples/duo-client/config build/duo-test-kit/
+          cp docs/examples/duo-final-events.json build/duo-test-kit/world/whiteout-story-events.json
+          cp docs/DUO-TEST-MODE-RU.md build/duo-test-kit/
+      - name: Retain optional Duo test files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Whiteout-Duo-Test-Kit
+          path: build/duo-test-kit/
+          if-no-files-found: error
+          retention-days: 14
       - name: Retain verified development build
         uses: actions/upload-artifact@v4
         with:
