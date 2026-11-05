@@ -4,11 +4,41 @@ import net.minecraft.registry.DynamicRegistryManager;
 import io.netty.buffer.Unpooled;
 
 public class DialogueRouteServerProbe {
+ private static void testDialoguePersistence()throws Exception{
+  var directory=java.nio.file.Files.createTempDirectory("whiteout-duo-save-");
+  var path=directory.resolve("zones.json");
+  try{
+   var store=dev.whiteout.StoryStoreReader.open(path);
+   var access=(DialogueBarrier.Access)(Object)store.data;
+   var player=java.util.UUID.randomUUID();
+   var id=java.util.UUID.randomUUID();
+   var records=new DialogueBarrier.Readers();
+   records.put(player,new DialogueBarrier.Reading(id,"story_first",true,3));
+   access.whiteout$readers(records);
+   store.save();
+   var loaded=dev.whiteout.StoryStoreReader.open(path);
+   var resumed=((DialogueBarrier.Access)(Object)loaded.data).whiteout$readers().get(player);
+   if(resumed==null||!id.equals(resumed.id())||!resumed.script().equals("story_first")||resumed.revision()!=3||!resumed.waitForReaders())
+    throw new AssertionError("Duo dialogue barrier lost after Store reopen");
+   if(!((DialogueBarrier.Access)(Object)loaded.networkSnapshot()).whiteout$readers().isEmpty())
+    throw new AssertionError("Pending Duo dialogues leaked into public snapshot");
+   var cleared=new DialogueBarrier.Readers();
+   ((DialogueBarrier.Access)(Object)loaded.data).whiteout$readers(cleared);
+   loaded.save();
+   if(!((DialogueBarrier.Access)(Object)dev.whiteout.StoryStoreReader.open(path).data).whiteout$readers().isEmpty())
+    throw new AssertionError("Completed acknowledgement revived on restart");
+  }finally{
+   java.nio.file.Files.deleteIfExists(path.resolveSibling("zones.json.tmp"));
+   java.nio.file.Files.deleteIfExists(path.resolveSibling("zones.json.bak"));
+   java.nio.file.Files.deleteIfExists(path);
+   java.nio.file.Files.deleteIfExists(directory);
+  }
+ }
  public static void main(String[] args)throws Exception{
   net.minecraft.SharedConstants.createGameVersion();net.minecraft.Bootstrap.initialize();
   DialogueRouteNetwork.register();
   StoryAuthority.register();
-  ScopedStoryProbe.run();DuoTestProbe.run();
+  ScopedStoryProbe.run();DuoTestProbe.run();testDialoguePersistence();
   long guards=java.util.Arrays.stream(dev.whiteout.net.WhiteoutNetwork.class.getDeclaredMethods())
    .filter(m->m.getName().contains("whiteout$before")).count();
   if(guards!=1)throw new AssertionError("Server story authority Mixin was not applied: "+guards);

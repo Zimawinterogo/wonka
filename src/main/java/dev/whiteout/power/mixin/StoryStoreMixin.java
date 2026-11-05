@@ -18,13 +18,14 @@ public abstract class StoryStoreMixin {
   return path;
  }
  @Inject(method="validateData",at=@At("RETURN"))
- private void whiteout$validatePlayers(CallbackInfo ci){ScopedStory.validate(data);dev.whiteout.power.SceneDelivery.validate(((dev.whiteout.power.SceneDelivery.Access)(Object)data).whiteout$grants());}
+ private void whiteout$validatePlayers(CallbackInfo ci){ScopedStory.validate(data);dev.whiteout.power.SceneDelivery.validate(((dev.whiteout.power.SceneDelivery.Access)(Object)data).whiteout$grants());dev.whiteout.power.DialogueBarrier.validate(((dev.whiteout.power.DialogueBarrier.Access)(Object)data).whiteout$readers());}
  @Inject(method="networkSnapshot",at=@At("RETURN"))
  private void whiteout$privateProgress(CallbackInfoReturnable<Store.Data> ci){
   ((ScopedStory.Players)(Object)ci.getReturnValue()).whiteout$players().clear();
   ((dev.whiteout.power.lobby.LobbyState.Access)(Object)ci.getReturnValue()).whiteout$lobby(null);
   ((dev.whiteout.power.SharedScene.Access)(Object)ci.getReturnValue()).whiteout$scene(null);
   ((dev.whiteout.power.SceneDelivery.Access)(Object)ci.getReturnValue()).whiteout$grants().clear();
+  ((dev.whiteout.power.DialogueBarrier.Access)(Object)ci.getReturnValue()).whiteout$readers(new dev.whiteout.power.DialogueBarrier.Readers());
  }
  @Inject(method="<init>(Ljava/nio/file/Path;)V",at=@At("RETURN"))
  private void whiteout$incompleteSave(Path path,CallbackInfo ci){
