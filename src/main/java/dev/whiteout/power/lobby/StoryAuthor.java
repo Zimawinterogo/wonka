@@ -15,6 +15,13 @@ import java.util.*;
 
 /** One revision-checked server definition per edit. The only path is the world's existing event catalogue. */
 public final class StoryAuthor{
+ /** Formatting must never make EditBoxWidget silently truncate a valid definition. */
+ public static String editorText(String json){
+  var value=JsonParser.parseString(json);var pretty=new GsonBuilder().setPrettyPrinting().create().toJson(value);
+  if(pretty.length()<=16000)return pretty;
+  var compact=value.toString();if(compact.length()>16000)throw new IllegalArgumentException("Событие превышает лимит редактора");
+  return compact;
+ }
  public record Page(UUID token,String key,String revision,String body,String message) implements CustomPayload{
   public static final Id<Page> ID=new Id<>(PowerDevices.id("board_story_editor"));
   public static final PacketCodec<RegistryByteBuf,Page> CODEC=PacketCodec.ofStatic((b,p)->{b.writeUuid(p.token);b.writeString(p.key,128);b.writeString(p.revision,64);b.writeString(p.body,16000);b.writeString(p.message,160);},b->new Page(b.readUuid(),b.readString(128),b.readString(64),b.readString(16000),b.readString(160)));
