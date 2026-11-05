@@ -106,7 +106,14 @@ public final class StoryAuthority {
    if(StoryWorldConditions.evaluate(event.world(),new StoryWorldSource(player,scoped))!=WinterCrisisConditions.Truth.TRUE)return StoryReceipts.Outcome.CONDITIONS_FALSE;
    var point=new ScopedStory.Position(player.getServerWorld().getRegistryKey().getValue().toString(),player.getX(),player.getY(),player.getZ(),player.getYaw(),player.getPitch());
    if(!DialogueBarrier.vote(player,event))return StoryReceipts.Outcome.WAITING;
-   var result=Narrative.commit(player,event,point);
+   var staged=DialogueBarrier.stage(player,store,event);
+   StoryCommitTransaction.Result result;
+   try{
+    result=Narrative.commit(player,store,Narrative.owner(player,event),event,point);
+    // Legacy WORLD no-op events skip Store.save; ensure dialogue-only cues are durable too.
+    if(result==StoryCommitTransaction.Result.COMMITTED&&staged!=null&&!event.once()&&event.actions().isEmpty()&&event.objectives().isEmpty()&&event.scenes().isEmpty()&&event.scope()==ScopedStory.Scope.WORLD&&event.checkpoint()==null&&event.narrative().endings().isEmpty())store.save();
+   }catch(Exception|Error failure){if(staged!=null)staged.rollback();throw failure;}
+   if(result!=StoryCommitTransaction.Result.COMMITTED&&staged!=null)staged.rollback();
    if(result==StoryCommitTransaction.Result.COMMITTED)try{DialogueBarrier.committed(player,event);}catch(RuntimeException delivery){LOG.warn("Committed narrative delivery failed",delivery);}
    if(result==StoryCommitTransaction.Result.COMMITTED&&event.trigger()!=null){
     try{TriggerAuthority.committed(player,key);}
