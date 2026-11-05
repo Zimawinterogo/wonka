@@ -17,7 +17,7 @@ final class AuthorScreen extends SharpScreen{
  private void receive(StoryAuthor.Page m){
   rev=m.revision();message=m.message();
   if(m.key().isEmpty()&&!m.body().isEmpty()){keys=new Gson().fromJson(m.body(),String[].class);if(keys.length>0)key.setText(keys[0]);}
-  else if(!m.body().isEmpty()){key.setText(m.key());body.setText(new GsonBuilder().setPrettyPrinting().create().toJson(JsonParser.parseString(m.body())));}
+  else if(!m.body().isEmpty()){key.setText(m.key());body.setText(StoryAuthor.editorText(m.body()));}
  }
  private void send(String id,String json){ClientPlayNetworking.send(new StoryAuthor.Page(board.token(),id,rev,json,""));}
  private void btn(int x,int y,int w,String name,Runnable action){addDrawableChild(LobbyUi.button(Text.literal(name),x,y,w,19,action));}
@@ -29,7 +29,7 @@ final class AuthorScreen extends SharpScreen{
    n.addProperty("mode","DUO");n.addProperty("actor",secret||ending?"SECOND":"ANY");n.addProperty("recipient",secret?"SECOND":"ANY");
    n.addProperty("visibility",secret?"SECRET":"SHARED");event.addProperty("scope",secret?"PLAYER":"WORLD");
    if(ending)n.add("endings",JsonParser.parseString("[{\"id\":\"ending_id\",\"title\":\"Название финала\",\"priority\":1,\"event\":\"server_ending_event\"}]"));
-   body.setText(new GsonBuilder().setPrettyPrinting().create().toJson(event));
+   body.setText(StoryAuthor.editorText(event.toString()));
   }catch(RuntimeException ex){message="Исправьте JSON перед применением шаблона";}
  }
  private void cycle(String field,String... values){
@@ -37,7 +37,7 @@ final class AuthorScreen extends SharpScreen{
    String selected=options.get((options.indexOf(policy.has(field)?policy.get(field).getAsString():"")+1)%options.size());policy.addProperty(field,selected);
    if(field.equals("visibility")){boolean shared=selected.equals("SHARED");event.addProperty("scope",shared?"WORLD":"PLAYER");if(!shared&&policy.get("recipient").getAsString().equals("ANY"))policy.addProperty("recipient","SECOND");}
    if(policy.get("visibility").getAsString().equals("SECRET")){if(field.equals("actor"))policy.addProperty("recipient",selected);else policy.addProperty("actor",policy.get("recipient").getAsString());}
-   body.setText(new GsonBuilder().setPrettyPrinting().create().toJson(event));message=field+" = "+selected;
+   body.setText(StoryAuthor.editorText(event.toString()));message=field+" = "+selected;
   }catch(RuntimeException ex){message="Выберите шаблон или загрузите событие с настройками ролей";}
  }
  @Override protected void init(){

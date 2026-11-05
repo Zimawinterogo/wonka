@@ -13,6 +13,9 @@ public class ScopedStoryProbe {
   var dir=Files.createTempDirectory(Path.of("."),"scoped-store-");
   var path=dir.resolve("world.json");var tmp=dir.resolve("world.json.tmp");
   var alice=UUID.randomUUID();var bob=UUID.randomUUID();
+  var compact="{\"values\":["+"0,".repeat(3000)+"0]}";
+  var formatted=dev.whiteout.power.lobby.StoryAuthor.editorText(compact);
+  check(formatted.length()<=16000&&com.google.gson.JsonParser.parseString(formatted).equals(com.google.gson.JsonParser.parseString(compact)),"large editor definition never truncated by pretty printing");
   try{
    var store=StoryStoreReader.open(path);store.save();
    for(var face:net.minecraft.util.math.Direction.Type.HORIZONTAL){
@@ -38,8 +41,9 @@ public class ScopedStoryProbe {
    check(!dev.whiteout.power.lobby.LobbyState.get(store).started()&&dev.whiteout.power.lobby.LobbyState.get(store).card().equals(card)
     &&store.data.completedEvents.contains("existing:story")&&!store.data.completedEvents.contains(dev.whiteout.power.lobby.LobbyState.STARTED),"unlock board only");
    var legacy=com.google.gson.JsonParser.parseString(Files.readString(path)).getAsJsonObject();
-   legacy.remove("playerStory");legacy.remove("storyLobby");Files.writeString(path,legacy.toString());
-   store=StoryStoreReader.open(path);check(store.error==null,"legacy file loaded");
+   for(var field:List.of("playerStory","storyLobby","duoPendingDialogues","storyDeliveries","runningStoryScene","lobbyBalance"))legacy.remove(field);
+   Files.writeString(path,legacy.toString());
+   store=StoryStoreReader.open(path);check(store.error==null&&store.data.completedEvents.contains("existing:story")&&((DialogueBarrier.Access)(Object)store.data).whiteout$readers().isEmpty(),"pre-Duo fixture loaded without losing existing progress");
    var event=Store.GSON.fromJson("""
     {"key":"dialogue_choice:test:0:1","once":true,"scope":"PLAYER","checkpoint":"camp",
     "area":{"dimension":"minecraft:overworld","radius":2},"conditions":[],

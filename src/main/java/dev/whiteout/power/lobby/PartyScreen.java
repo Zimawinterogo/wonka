@@ -10,7 +10,7 @@ import java.util.*;
 final class PartyScreen extends SharpScreen{
  static UUID token;static Party.Status state;
  private final BoardNetwork.View view;
- private int tab,page;private final TextFieldWidget[] fields=new TextFieldWidget[9];private String error="";
+ private int tab,page,fieldsTab=-1;private final TextFieldWidget[] fields=new TextFieldWidget[9];private String error="";
  PartyScreen(BoardNetwork.View v,int tab){super(Text.literal("Whiteout"));view=v;this.tab=tab;}
  static void register(){ClientPlayNetworking.registerGlobalReceiver(Party.Info.ID,(m,c)->c.client().execute(()->{
   token=m.token();state=BoardNetwork.JSON.fromJson(m.json(),Party.Status.class);
@@ -23,12 +23,15 @@ final class PartyScreen extends SharpScreen{
  private String name(UUID id){return state.online().stream().filter(p->p.id().equals(id)).map(Party.Person::name).findFirst().orElse("офлайн");}
  @Override protected void init(){
   if(state==null||!view.token().equals(token))return;
+  String[] draft=new String[fields.length];
+  if(fieldsTab==tab)for(int i=0;i<fields.length;i++)if(fields[i]!=null)draft[i]=fields[i].getText();
+  fieldsTab=tab;
   var box=LobbyUi.Box.centered(width,height,406,248);int x=box.x()+22,y=box.y()+30;var me=client.player.getUuid();
   btn(x+204,y+181,72,"Назад",()->close());
   if(tab==1){
    String[] val={"","","","",""};var start=state.start();
    if(start!=null){if(start.dimension()!=null){val[0]=start.dimension();val[1]=""+start.x();val[2]=""+start.y();val[3]=""+start.z();}if(start.event()!=null)val[4]=start.event();}
-   for(int i=0;i<5;i++){fields[i]=addDrawableChild(new TextFieldWidget(textRenderer,x+86,y+i*23,196,19,Text.literal("Старт")));fields[i].setMaxLength(128);fields[i].setText(val[i]);}
+   for(int i=0;i<5;i++){fields[i]=addDrawableChild(new TextFieldWidget(textRenderer,x+86,y+i*23,196,19,Text.literal("Старт")));fields[i].setMaxLength(128);fields[i].setText(draft[i]==null?val[i]:draft[i]);}
    btn(x,y+120,138,"Текущая позиция",()->{fields[0].setText(state.dimension());fields[1].setText(""+state.x());fields[2].setText(""+state.y());fields[3].setText(""+state.z());});
    btn(x+142,y+120,140,"На месте",()->{for(int i=0;i<4;i++)fields[i].setText("");});
    btn(x+75,y+146,130,"Сохранить старт",()->{try{
@@ -42,7 +45,7 @@ final class PartyScreen extends SharpScreen{
    btn(x+64,y+95,156,"Своя…",()->{tab=3;clearAndInit();});return;}
   if(tab==3){
    var b=state.balance()==null?Balance.preset("normal"):state.balance();int[] values={b.newFuel(),b.oldFuel(),b.lampMinutes(),b.chargeMinutes(),b.torchMinutes(),b.fusePercent(),b.fuseSeconds(),b.stormSeconds(),b.snowSeconds()};
-   for(int i=0;i<9;i++){fields[i]=addDrawableChild(new TextFieldWidget(textRenderer,x+(i/5)*144+88,y+18+(i%5)*22,46,18,Text.literal(labels[i])));fields[i].setMaxLength(5);fields[i].setText(""+values[i]);}
+   for(int i=0;i<9;i++){fields[i]=addDrawableChild(new TextFieldWidget(textRenderer,x+(i/5)*144+88,y+18+(i%5)*22,46,18,Text.literal(labels[i])));fields[i].setMaxLength(5);fields[i].setText(draft[i]==null?""+values[i]:draft[i]);}
    btn(x,y+141,138,"К нормальной",()->request("difficulty","normal"));
    btn(x+144,y+141,138,"Сохранить",()->{try{int[] n=Arrays.stream(fields).mapToInt(t->Integer.parseInt(t.getText())).toArray();request("difficulty",BoardNetwork.JSON.toJson(new Balance("custom",n[0],n[1],n[2],n[3],n[4],n[5],n[6],n[7],n[8])));}catch(RuntimeException ex){error="Проверьте диапазоны";}});return;
   }

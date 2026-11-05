@@ -27,7 +27,9 @@ public final class BoardBlock extends Block {
  public static boolean complete(World world,BlockPos root,BlockState reference){
   Direction face=reference.get(FACE);
   for(int i=0;i<4;i++){
-   var p=cell(root,face,i);var s=world.getBlockState(p);
+   var p=cell(root,face,i);
+   if(!world.isChunkLoaded(p)||!world.isChunkLoaded(p.offset(face.getOpposite())))return false;
+   var s=world.getBlockState(p);
    if(!s.isOf(reference.getBlock())||s.get(FACE)!=face||s.get(PART)!=i||!supported(world,p,face))return false;
   }
   return true;
@@ -47,14 +49,14 @@ public final class BoardBlock extends Block {
  @Override protected void onStateReplaced(BlockState state,World world,BlockPos pos,BlockState next,boolean moved){
   super.onStateReplaced(state,world,pos,next,moved);
   if(world.isClient||next.isOf(this))return;var anchor=root(pos,state);
-  for(int i=0;i<4;i++){var part=cell(anchor,state.get(FACE),i);if(!part.equals(pos)&&world.getBlockState(part).isOf(this))world.scheduleBlockTick(part,this,1);}
+  for(int i=0;i<4;i++){var part=cell(anchor,state.get(FACE),i);if(!part.equals(pos)&&world.isChunkLoaded(part)&&world.getBlockState(part).isOf(this))world.scheduleBlockTick(part,this,1);}
  }
  @Override protected void onBlockAdded(BlockState s,World world,BlockPos pos,BlockState old,boolean notify){
   super.onBlockAdded(s,world,pos,old,notify);world.scheduleBlockTick(pos,this,1);
  }
  @Override public BlockState onBreak(World world,BlockPos pos,BlockState s,PlayerEntity player){
   if(!world.isClient&&player.isCreative()&&s.get(PART)!=0){
-   var anchor=root(pos,s);if(world.getBlockState(anchor).equals(s.with(PART,0)))world.removeBlock(anchor,false);
+   var anchor=root(pos,s);if(world.isChunkLoaded(anchor)&&world.getBlockState(anchor).equals(s.with(PART,0)))world.removeBlock(anchor,false);
   }
   return super.onBreak(world,pos,s,player);
  }
@@ -77,7 +79,7 @@ public final class BoardBlock extends Block {
    var world=ctx.getWorld();var root=ctx.getBlockPos();var player=ctx.getPlayer();
    for(int i=0;i<4;i++){
     var pos=cell(root,face,i);var state=getBlock().getDefaultState().with(FACE,face).with(PART,i);
-    if(!world.isChunkLoaded(pos)||world.isOutOfHeightLimit(pos)||!world.getWorldBorder().contains(pos)||!world.getBlockState(pos).isAir()||
+    if(!world.isChunkLoaded(pos)||!world.isChunkLoaded(pos.offset(face.getOpposite()))||world.isOutOfHeightLimit(pos)||!world.getWorldBorder().contains(pos)||!world.getBlockState(pos).isAir()||
        !supported(world,pos,face)||player==null||!world.canPlayerModifyAt(player,pos)||!world.canPlace(state,pos,ShapeContext.of(player)))return null;
    }
    return getBlock().getDefaultState().with(FACE,face).with(PART,0);

@@ -55,6 +55,28 @@ public final class DuoTestProbe {
     check(reopened.store.data.completedEvents.contains(Narrative.FINISHED)&&reopened.store.data.completedEvents.contains("whiteout:ending/"+expected),"durable ending");
    }
    var retries=new PhotoTransfer.RetrySchedule();var due=new ArrayList<Integer>();for(int tick=1;tick<=1000;tick++)if(retries.due())due.add(tick);
+   // Test mode uses the same durable reader ledger as real Duo, in its own file.
+   var queuedPath=directory.resolve("queued.json");var queuedTest=new DuoTestMode(user,queuedPath,point);
+   queuedTest.prepare();queuedTest.ready=true;queuedTest.launch();
+   var dialogue=example.find("cutscene_trigger:final_meeting");
+   var stage=DialogueBarrier.stage(queuedTest.store,dialogue,user);
+   check(stage!=null&&DialogueBarrier.readers(queuedTest.store).size()==2,"both role dialogues staged");
+   stage.rollback();check(DialogueBarrier.readers(queuedTest.store).isEmpty(),"failed event rolls back staged readers");
+   DialogueBarrier.stage(queuedTest.store,dialogue,user);queuedTest.store.save();
+   DialogueBarrier.stage(queuedTest.store,dialogue,user);queuedTest.store.save();
+   var resumed=new DuoTestMode(user,queuedPath,point);resumed.prepare();
+   var pending=DialogueBarrier.readers(resumed.store).get(user);
+   check(pending.queue().size()==1&&DialogueBarrier.readers(resumed.store).get(bot).queue().size()==1,"test-mode restart retains both queues");
+   var before=Files.readString(queuedPath);var blocked=queuedPath.resolveSibling("queued.json.tmp");Files.createDirectory(blocked);
+   try{DialogueBarrier.acknowledge(resumed.store,user,pending.id());throw new AssertionError("failed ack save accepted");}catch(java.io.IOException expected){}
+   check(DialogueBarrier.readers(resumed.store).get(user).equals(pending)&&Files.readString(queuedPath).equals(before),"ack failure preserves memory and disk");
+   Files.delete(blocked);
+   check(!DialogueBarrier.acknowledge(resumed.store,user,pending.queue().getFirst().id()),"queued ack cannot bypass current dialogue");
+   check(DialogueBarrier.acknowledge(resumed.store,user,pending.id()),"first ack persisted");
+   check(!DialogueBarrier.acknowledge(resumed.store,user,pending.id()),"replayed ack ignored");
+   var after=new DuoTestMode(user,queuedPath,point);
+   check(DialogueBarrier.readers(after.store).get(user).id().equals(pending.queue().getFirst().id()),"next dialogue survives another restart");
+   check(DialogueBarrier.readers(after.store).get(bot).queue().size()==1,"human ack preserves bot queue");
    check(due.equals(List.of(85,170,255)),"bounded retry schedule");
    Set<Integer> inFlight=new HashSet<>();check(!PhotoTransfer.reserve(inFlight,0,()->false)&&inFlight.isEmpty(),"rate limit does not consume slot");
    check(PhotoTransfer.reserve(inFlight,0,()->true)&&!PhotoTransfer.reserve(inFlight,0,()->true),"single transfer");
