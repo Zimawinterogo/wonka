@@ -24,6 +24,15 @@ jobs:
           python-version: '3.12'
       - name: Restore existing personal music for local assembly only
         run: python tools/private_music.py Whiteout-3.12.9-1.21.1.jar --extract src/main/resources
+      - name: Fetch Gradle distribution with retry on transient CDN failures
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if bash gradlew --version > /dev/null; then exit 0; fi
+            echo "Gradle download failed (attempt $attempt/4)"
+            sleep $((attempt * 10))
+          done
+          exit 1
       - name: Compile, regressions and Fabric side probes
         run: bash gradlew --no-daemon --console=plain check assembleWhiteout -I qa/foundation.gradle -I qa/dialogue-routes.gradle foundationTests routeProbeClient routeProbeServer
       - name: Verify complete resources and preserved music

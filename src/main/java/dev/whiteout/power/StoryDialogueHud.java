@@ -96,6 +96,7 @@ public final class StoryDialogueHud {
   if(--remaining<=0){
    String finishedId=current.id;
    next(mc);
+   if(!contains(finishedId))DuoPresentation.finished(finishedId);
    if(current==null&&finishedId.equals(DialogueManager.activeId())) DialogueManager.resetSession();
   }
  }
@@ -105,6 +106,7 @@ public final class StoryDialogueHud {
    display.resize(mc,w,h);lastWidth=w;lastHeight=h;
   }
  }
+ public static boolean contains(String id){return current!=null&&current.id.equalsIgnoreCase(id)||QUEUE.stream().anyMatch(entry->entry.id.equalsIgnoreCase(id));}
  /** Remove only entries owned by one story; preserve unrelated active/queued dialogue. */
  public static void clearScript(String id){
   QUEUE.removeIf(entry->entry.id.equals(id));

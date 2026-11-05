@@ -31,7 +31,8 @@ final class PhotoScreen extends SharpScreen{
   net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(c->{if(current!=null&&(c.currentScreen instanceof BoardScreen||c.currentScreen instanceof PhotoScreen)){if(retries.due())requestMissing(current);}});
   ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->client.execute(()->{clear(client);current=null;}));
   ClientPlayNetworking.registerGlobalReceiver(Part.ID,(p,c)->c.client().execute(()->{
-   if(current==null||!current.token().equals(p.token())||p.index()<0||p.index()>=pictures(current).size())return;
+   if(current==null||!current.token().equals(p.token())||current.revision()!=p.revision()||p.index()<0||p.index()>=pictures(current).size())return;
+   if(cache.containsKey(pictures(current).get(p.index()).hash()))return;
    if(p.part()==0)incoming.put(p.index(),new Assembly(p.token(),p.revision(),p.index()));
    var a=incoming.get(p.index());if(a==null)return;
    try{if(a.add(p)){incoming.remove(p.index());var hash=pictures(current).get(p.index()).hash();if(hash(a.bytes).equals(hash))cache.put(hash,texture(c.client(),hash,a.bytes));}}catch(RuntimeException ex){incoming.remove(p.index());}

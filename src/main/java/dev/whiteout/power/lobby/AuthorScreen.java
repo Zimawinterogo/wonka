@@ -41,12 +41,15 @@ final class AuthorScreen extends SharpScreen{
   }catch(RuntimeException ex){message="Выберите шаблон или загрузите событие с настройками ролей";}
  }
  @Override protected void init(){
+  boolean firstOpen=key==null;
+  String savedKey=firstOpen?"":key.getText(),savedBody=body==null?"":body.getText();
   int x=10,w=width-20;key=addDrawableChild(new TextFieldWidget(textRenderer,x,22,w-99,19,Text.literal("ID события")));key.setMaxLength(128);
   btn(x+w-95,22,23,"›",()->{if(keys.length>0)key.setText(keys[++page%keys.length]);});btn(x+w-70,22,70,"Загрузить",()->send(key.getText(),""));
   body=addDrawableChild(new EditBoxWidget(textRenderer,x,46,w,height-117,Text.literal("Определение события JSON"),Text.literal("Событие")));body.setMaxLength(16000);
   int y=height-66;btn(x,y,66,"Общее",()->preset(false,false));btn(x+69,y,70,"Секретное",()->preset(true,false));btn(x+142,y,61,"Финал",()->preset(false,true));
   btn(x,y+20,63,"Режим",()->cycle("mode","BOTH","SOLO","DUO"));btn(x+65,y+20,60,"Автор",()->cycle("actor","ANY","FIRST","SECOND"));btn(x+127,y+20,81,"Получатель",()->cycle("recipient","ANY","FIRST","SECOND"));btn(x+210,y+20,80,"Видимость",()->cycle("visibility","SHARED","PERSONAL","SECRET"));
-  btn(x+w-84,height-20,84,"Сохранить",()->send(key.getText(),body.getText()));send("","");
+  key.setText(savedKey);body.setText(savedBody);
+  btn(x+w-84,height-20,84,"Сохранить",()->send(key.getText(),body.getText()));if(firstOpen)send("","");
  }
  @Override public void render(DrawContext d,int mx,int my,float dt){LobbyUi.backdrop(d,width,height);LobbyUi.board(d,new LobbyUi.Box(3,3,width-6,height-6));
   LobbyUi.chalk(d,8,42,width-16,height-108);

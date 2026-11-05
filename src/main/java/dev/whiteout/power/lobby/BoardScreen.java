@@ -41,6 +41,7 @@ public final class BoardScreen extends SharpScreen {
   int bottom=y+h-37;
   if(editing){
    String[] vals=values();
+   for(int i=0;i<fields.length;i++)if(fields[i]!=null)vals[i]=fields[i].getText();
    for(int i=0;i<5;i++){
     int fy=y+49+i*27;
     TextFieldWidget f=new TextFieldWidget(textRenderer,x+110,fy,w-130,19,tr(NAMES[i]));
