@@ -59,6 +59,11 @@ public final class BoardBlock extends Block {
   return super.onBreak(world,pos,s,player);
  }
  @Override protected void scheduledTick(BlockState s,ServerWorld world,BlockPos pos,Random random){
+  var anchor=root(pos,s);var face=s.get(FACE);
+  for(int i=0;i<4;i++){
+   var cell=cell(anchor,face,i);
+   if(!world.isChunkLoaded(cell)||!world.isChunkLoaded(cell.offset(face.getOpposite()))){world.scheduleBlockTick(pos,this,20);return;}
+  }
   if(!complete(world,root(pos,s),s))world.breakBlock(pos,s.get(PART)==0);
  }
  @Override protected ActionResult onUse(BlockState s,World world,BlockPos pos,PlayerEntity player,BlockHitResult hit){

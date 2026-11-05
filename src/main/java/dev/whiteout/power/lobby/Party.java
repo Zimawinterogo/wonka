@@ -22,6 +22,9 @@ public final class Party {
  private Party(){}
  public record Person(UUID id,String name){}
  public record Status(long revision,boolean started,UUID host,UUID partner,UUID invited,boolean mine,boolean other,boolean canStart,List<Person> online,String dimension,double x,double y,double z,LobbyState.Start start,Balance balance){}
+ public static boolean readyFor(Status status,UUID viewer,UUID participant){
+  return participant!=null&&(participant.equals(viewer)?status.mine():status.other());
+ }
  public record Info(UUID token,String json) implements CustomPayload{
   public static final Id<Info> ID=new Id<>(PowerDevices.id("board_party"));
   public static final PacketCodec<RegistryByteBuf,Info> CODEC=PacketCodec.ofStatic((b,p)->{b.writeUuid(p.token);b.writeString(p.json,24000);},b->new Info(b.readUuid(),b.readString(24000)));

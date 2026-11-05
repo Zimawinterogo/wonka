@@ -53,9 +53,27 @@ public final class DialogueBarrier{
   }
  }
  static void register(){
+  net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher,registry,environment)->dispatcher.register(
+   net.minecraft.server.command.CommandManager.literal("whiteout").then(net.minecraft.server.command.CommandManager.literal("lobby")
+   .then(net.minecraft.server.command.CommandManager.literal("retry-dialogue").executes(context->{
+    var player=context.getSource().getPlayerOrThrow();var test=DuoTestMode.active(player);
+    if(test!=null)return test.retryDialogue(player)?1:0;
+    var reader=run(player.getServer()).readers.get(player.getUuid());var state=LobbyState.get(Store.get(player.getServer()));
+    if(reader==null||state==null||reader.revision!=state.revision())return 0;
+    send(player,new Cue(reader.id,"dialogue",reader.script));return 1;
+   })))));
   SharedScene.register();PayloadTypeRegistry.playS2C().register(Cue.ID,Cue.CODEC);PayloadTypeRegistry.playC2S().register(Cue.ID,Cue.CODEC);
   ServerPlayNetworking.registerGlobalReceiver(Cue.ID,(cue,c)->c.server().execute(()->{
    if(cue.kind.equals("scope_ack")){DuoTestMode.acknowledge(c.player(),cue.id);return;}
+   if(cue.kind.equals("read_error")){
+    var test=DuoTestMode.active(c.player());
+    var reader=run(c.server()).readers.get(c.player().getUuid());
+    if(test!=null?test.readError(cue.id):reader!=null&&reader.id.equals(cue.id)){
+     c.player().sendMessage(net.minecraft.text.Text.literal("Диалог не прочитан или прерван. Проверьте клиентские ресурсы; повтор: /whiteout lobby retry-dialogue. Сюжетное подтверждение не выдано."));
+     org.slf4j.LoggerFactory.getLogger("whiteout-dialogue").warn("Dialogue load failed for player {} cue {}",c.player().getUuid(),cue.id);
+    }
+    return;
+   }
    var test=DuoTestMode.active(c.player());if(test!=null&&cue.kind.equals("read")){test.read(cue.id);return;}
    if(!cue.kind.equals("read")){SharedScene.response(c.player(),cue);return;}var r=run(c.server());var reader=r.readers.get(c.player().getUuid());
    if(reader!=null&&reader.id.equals(cue.id))r.readers.remove(c.player().getUuid());

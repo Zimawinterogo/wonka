@@ -8,8 +8,18 @@ import java.util.*;
 public final class DuoTestProbe {
  private static void check(boolean value,String label){if(!value)throw new AssertionError(label);}
  public static void run()throws Exception{
+  check(DuoTestMode.participantCount(false,"minecraft:overworld","minecraft:overworld")==1,"offline bot excluded");
+  check(DuoTestMode.participantCount(true,"minecraft:overworld","minecraft:overworld")==2,"online same dimension bot counted");
+  check(DuoTestMode.participantCount(true,"minecraft:overworld","minecraft:the_nether")==1,"other dimension bot excluded");
+  var photoToken=UUID.randomUUID();var assembly=new PhotoTransfer.Assembly(photoToken,7,0);
+  try{assembly.add(new PhotoTransfer.Part(photoToken,6,0,0,new byte[PhotoTransfer.CHUNK]));throw new AssertionError("stale photo accepted");}catch(IllegalArgumentException expected){}
+  try{assembly.add(new PhotoTransfer.Part(photoToken,7,0,1,new byte[PhotoTransfer.CHUNK]));throw new AssertionError("lost first part accepted");}catch(IllegalArgumentException expected){}
+  for(int i=0;i<PhotoTransfer.COUNT;i++)check(assembly.add(new PhotoTransfer.Part(photoToken,7,0,i,new byte[PhotoTransfer.CHUNK]))==(i==PhotoTransfer.COUNT-1),"photo completion");
+  try{assembly.add(new PhotoTransfer.Part(photoToken,7,0,0,new byte[PhotoTransfer.CHUNK]));throw new AssertionError("duplicate completed transfer accepted");}catch(IllegalArgumentException expected){}
   var directory=Files.createTempDirectory(Path.of("."),"duo-probe-");
   var user=UUID.randomUUID();var bot=DuoTestMode.BOT;
+  var roster=new dev.whiteout.power.lobby.Party.Status(1,false,bot,user,null,true,false,false,List.of(),"minecraft:overworld",0,64,0,null,null);
+  check(!dev.whiteout.power.lobby.Party.readyFor(roster,user,bot)&&dev.whiteout.power.lobby.Party.readyFor(roster,user,user),"SECOND viewer sees FIRST/SECOND readiness correctly");
   var point=new ScopedStory.Position("minecraft:overworld",0,64,0,0,0);
   var example=new StoryEventCatalog(Path.of("../../docs/examples/duo-final-events.json"));
   check(!example.invalid(),example.error());

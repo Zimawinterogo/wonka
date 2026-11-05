@@ -23,6 +23,7 @@ public final class DialogueRouteClient {
  private DialogueRouteClient(){}
  public static Text text(String key,Object... args){return Text.translatable("route.whiteout."+key,args);}
  public static boolean isRoute(String id){return id!=null&&id.startsWith(DialogueRoute.PREFIX);}
+ public static boolean pending(){return !QUEUE.empty();}
  public static void register(){
   ClientPlayConnectionEvents.DISCONNECT.register((h,mc)->clear());
   ClientTickEvents.END_CLIENT_TICK.register(mc->{tick++;if(world!=mc.world){clear();world=mc.world;}pump(mc);});
@@ -67,6 +68,7 @@ public final class DialogueRouteClient {
    if(id==null){message("missing_dialogue");QUEUE.complete(head.token());ready=null;return;}
   }
   QUEUE.complete(head.token());ready=null;
+  DuoPresentation.resolved(call.id(),id);
   bypass=true;
   try{
    if(DialogueManager.findById(id)!=null){if(call.duration()<0)DialogueManager.open(id);else DialogueManager.openDirector(id,call.duration());}

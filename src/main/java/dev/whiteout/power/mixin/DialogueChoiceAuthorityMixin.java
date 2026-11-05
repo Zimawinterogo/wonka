@@ -17,6 +17,15 @@ public abstract class DialogueChoiceAuthorityMixin {
   if(dev.whiteout.power.MigratedTriggerClient.hidden(choiceKey(index)))ci.setReturnValue(false);
  }
  @Unique private int whiteout$choiceIndex;
+ @Shadow @Final private DialogueManager.Script script;
+ @Inject(method="executeReply",at=@At("HEAD"),remap=false)
+ private void whiteout$followDialogue(String command,String dialogue,int next,CallbackInfo ci){
+  if((command==null||command.isBlank())&&dialogue!=null&&DialogueManager.findById(dialogue)!=null)dev.whiteout.power.DuoPresentation.resolved(script.id(),dialogue);
+ }
+ @Inject(method="moveTo",at=@At("HEAD"),remap=false)
+ private void whiteout$finishedReading(int next,String dialogue,CallbackInfo ci){
+  if(next<0||next>=script.lines().size())dev.whiteout.power.DuoPresentation.finished(script.id());
+ }
  @ModifyArg(method={"tick","method_25393"},at=@At(value="INVOKE",target="Ljava/lang/Math;min(II)I",ordinal=0),index=1,remap=false)
  private int whiteout$readingSpeed(int ticks){return ticks*dev.whiteout.power.lobby.PersonalScreen.prefs().letters();}
  @Shadow private String choiceKey(int index){throw new AssertionError();}
@@ -48,8 +57,9 @@ public abstract class DialogueChoiceAuthorityMixin {
    logCurrentLine();showPlayerReply(line,choice.text());
    boolean blocking=StoryEffects.hasBlocking(effects);
    if(!effects.isEmpty()&&!StoryEffects.run(effects))return false;
+   if(blocking)dev.whiteout.power.DuoPresentation.finished(script.id());
    if(!blocking){
-    if(migrated&&choice.command()!=null&&choice.command().regionMatches(true,0,"director_signal:",0,16)){mc.setScreen(null);return true;}
+    if(migrated&&choice.command()!=null&&choice.command().regionMatches(true,0,"director_signal:",0,16)){dev.whiteout.power.DuoPresentation.finished(script.id());mc.setScreen(null);return true;}
     executeReply(migrated?"":choice.command(),choice.dialogue(),choice.next());
    }
    return true;

@@ -61,8 +61,11 @@ public final class DuoTestMode {
  void prepare()throws Exception{need(!prepared,"Сессия уже подготовлена");if(LobbyState.get(store)==null)roster(false);prepared=true;}
  public void launch()throws Exception{need(prepared&&connected&&ready&&!started(),"Нужны start, ready и незапущенная сессия");roster(true);}
  public dev.whiteout.power.lobby.Party.Status statusView(ServerPlayerEntity p,LobbyState actual){
-  var point=position(p);return new dev.whiteout.power.lobby.Party.Status(actual==null?0:actual.revision(),started(),humanFirst?operator:BOT,humanFirst?BOT:operator,null,true,ready,prepared&&ready&&connected&&!started(),
-   List.of(new dev.whiteout.power.lobby.Party.Person(operator,p.getGameProfile().getName()),new dev.whiteout.power.lobby.Party.Person(BOT,"Whiteout Test Bot")),point.dimension(),point.x(),point.y(),point.z(),null,null);
+  var point=position(p);var online=new ArrayList<dev.whiteout.power.lobby.Party.Person>();
+  online.add(new dev.whiteout.power.lobby.Party.Person(operator,p.getGameProfile().getName()));
+  if(connected)online.add(new dev.whiteout.power.lobby.Party.Person(BOT,"Whiteout Test Bot"));
+  return new dev.whiteout.power.lobby.Party.Status(actual==null?0:actual.revision(),started(),humanFirst?operator:BOT,humanFirst?BOT:operator,null,prepared,ready&&connected,prepared&&ready&&connected&&!started(),
+   online,point.dimension(),point.x(),point.y(),point.z(),null,null);
  }
  public Store.Data snapshot(Store.Data result){var state=ScopedStory.snapshot(store,operator);StoryObjectiveActions.State.capture(state).publish(result);result.checkpoints=state.checkpoints;result.storyResetEpoch=state.storyResetEpoch;return result;}
  private UUID role(Narrative.Role role,UUID actor){var d=LobbyState.get(store);return switch(role){case ANY->actor;case FIRST->d.first();case SECOND->d.second();};}
@@ -86,7 +89,7 @@ public final class DuoTestMode {
   if(e.once()&&data.completedEvents.contains(e.key())||!StoryRules.matches(data.storyVariables,e.conditions()))return false;
   var source=new StoryWorldSource(p,data);
   return StoryWorldConditions.evaluate(e.world(),node->{
-   if(node.metric()==StoryWorldConditions.Metric.PLAYER_COUNT)return OptionalDouble.of(position(p).dimension().equals(botPosition.dimension())?2:1);
+   if(node.metric()==StoryWorldConditions.Metric.PLAYER_COUNT)return OptionalDouble.of(participantCount(connected,position(p).dimension(),botPosition.dimension()));
    if(actor.equals(BOT)&&!position(p).equals(botPosition))switch(node.metric()){
     case SHELTER_PROTECTION,COLD_LEVEL,BLIZZARD,WIND_STRENGTH,SNOWFALL,ZONE_ACTIVE,TIME_OF_DAY->{return OptionalDouble.empty();}default->{}
    }
@@ -100,6 +103,26 @@ public final class DuoTestMode {
   if(!evidence(id).permits(rule,p.getServer().getTicks()))return false;
   if(binding.zone())return point.dimension().equals(event.area().dimension())&&body(point).intersects(event.area())==(binding.type()==TriggerEvidence.Kind.ENTER_BOX);
   return event.area()==null||inside(event.area(),point);
+ }
+ private String rejection(ServerPlayerEntity p,UUID actor,StoryEventCatalog.Event e){
+  if(e==null)return "неизвестный ключ";
+  if(!started())return "сессия не запущена";
+  if(!connected&&(!alone||actor.equals(BOT)))return "напарник отключён";
+  if(e.serverOnly())return "событие разрешено только серверу";
+  if(store.data.completedEvents.contains(Narrative.FINISHED))return "история уже завершена";
+  if(SharedScene.current(store)!=null)return "активна совместная кат-сцена";
+  var n=e.narrative();var d=LobbyState.get(store);
+  if(n!=null&&!actor.equals(role(n.actor(),actor)))return "неправильная роль: требуется "+n.actor();
+  if(n!=null&&!Narrative.matches(store,d,n.when()))return "не выполнены сюжетные условия";
+  if(n!=null&&n.together()&&(!inside(e.area(),position(p))||connected&&!inside(e.area(),botPosition)))return "оба участника должны находиться в зоне";
+  var reader=readers.get(actor);
+  if(readers.entrySet().stream().anyMatch(entry->entry.getValue().barrier&&(connected||!entry.getKey().equals(BOT)))&&(reader==null||!e.key().startsWith("dialogue_choice:"+reader.script+":")))return "активно обязательное чтение; проверьте read / read-self";
+  var data=ScopedStory.read(store.data,e.scope(),n==null?actor:role(n.recipient(),actor));
+  if(e.once()&&data.completedEvents.contains(e.key()))return "выбор или событие уже выполнено";
+  if(!StoryRules.matches(data.storyVariables,e.conditions()))return "не выполнены условия переменных";
+  if(e.trigger()!=null&&!evidence(actor).permits(new TriggerEvidence.Rule(e.key(),e.area(),e.trigger()),p.getServer().getTicks()))return "нет актуального подтверждения триггера / доступного варианта";
+  if(e.area()!=null&&!inside(e.area(),at(actor,p)))return "участник вне зоны";
+  return "не выполнены серверные условия мира, состояния игрока или доступности сцены";
  }
  static TriggerEvidence.Body body(ScopedStory.Position p){return new TriggerEvidence.Body(p.dimension(),p.x()-.3,p.y(),p.z()-.3,p.x()+.3,p.y()+1.8,p.z()+.3);}
  boolean vote(UUID who,String key){ballots.put(who,key);return key.equals(ballots.get(who.equals(BOT)?operator:BOT));}
@@ -127,6 +150,9 @@ public final class DuoTestMode {
  }
  private static void send(ServerPlayerEntity p,DialogueBarrier.Cue cue){if(ServerPlayNetworking.canSend(p,DialogueBarrier.Cue.ID))ServerPlayNetworking.send(p,cue);}
  void read(UUID id){var r=readers.get(operator);if(r!=null&&r.id.equals(id))readers.remove(operator);}
+ boolean readError(UUID id){var r=readers.get(operator);return r!=null&&r.id.equals(id);}
+ boolean retryDialogue(ServerPlayerEntity player){var reader=readers.get(operator);if(reader==null)return false;send(player,new DialogueBarrier.Cue(reader.id,"dialogue",reader.script));return true;}
+ static int participantCount(boolean connected,String humanDimension,String botDimension){return connected&&humanDimension.equals(botDimension)?2:1;}
  boolean botLoaded(UUID id,int tick){
   if(!id.equals(camera)){camera=id;cameraSince=tick;botSkip=false;}
   return connected&&(tick-cameraSince>=200||loadDelay>=0&&tick-cameraSince>=loadDelay);
@@ -205,7 +231,7 @@ public final class DuoTestMode {
      need(ray.getType()==net.minecraft.util.hit.HitResult.Type.MISS&&t.arm(p,BOT,TriggerEvidence.Kind.INTERACT_ENTITY,arg)>0,"Нет доступного взаимодействия");}
     case "read-self"->{need(t.readers.remove(t.operator)!=null,"Игрок не читает диалог");}
     case "skip-self"->{var scene=SharedScene.current(t.store);need(scene!=null,"Нет общей сцены");SharedScene.response(p,new DialogueBarrier.Cue(scene.id(),"skip",""));}
-    case "choose","act","self"->{var e=StoryAuthority.definition(server,arg);need(!op.equals("choose")||e.trigger()!=null&&e.trigger().type()==TriggerEvidence.Kind.CHOICE,"Нужен ключ варианта диалога");var result=t.act(p,op.equals("self")?t.operator:BOT,arg);tell(p,"Результат: "+switch(result){case COMMITTED->"выполнено";case WAITING->"ожидание второго решения";default->"отклонено";});return result==StoryReceipts.Outcome.COMMITTED||result==StoryReceipts.Outcome.WAITING?1:0;}
+    case "choose","act","self"->{var e=StoryAuthority.definition(server,arg);need(e!=null,"Неизвестный ключ: "+arg);need(!op.equals("choose")||e.trigger()!=null&&e.trigger().type()==TriggerEvidence.Kind.CHOICE,"Нужен ключ варианта диалога");var actor=op.equals("self")?t.operator:BOT;var result=t.act(p,actor,arg);tell(p,"Результат: "+switch(result){case COMMITTED->"выполнено";case WAITING->"ожидание второго решения";default->"отклонено: "+t.rejection(p,actor,e);});return result==StoryReceipts.Outcome.COMMITTED||result==StoryReceipts.Outcome.WAITING?1:0;}
     case "choices"->{var keys=new ArrayList<String>();for(var rule:StoryAuthority.catalog(server).rules())if(rule.binding().type()==TriggerEvidence.Kind.CHOICE&&t.admitted(p,BOT,StoryAuthority.definition(server,rule.key())))keys.add(rule.key());tell(p,"Допустимые ответы: "+keys);return 1;}
     case "state"->{for(var who:List.of(t.operator,BOT)){var data=ScopedStory.read(t.store.data,ScopedStory.Scope.PLAYER,who);tell(p,(who.equals(BOT)?"Бот":"Игрок")+" · переменные "+Store.GSON.toJson(data.storyVariables)+" · события "+data.completedEvents+" · цели "+data.objectives.values().stream().map(o->o.id+"="+o.status+" ("+o.title+")").toList()+" · точки "+data.checkpoints.keySet());}tell(p,"Общие события "+t.store.data.completedEvents+" · тестовые выдачи "+((SceneDelivery.Access)(Object)t.store.data).whiteout$grants());return 1;}
     case "reset"->{need(arg.equals("confirm"),"Нужно reset confirm");t.detach(p);for(var suffix:List.of("",".bak",".tmp"))Files.deleteIfExists(t.path.resolveSibling(t.path.getFileName()+suffix));sessions.put(server,new DuoTestMode(p.getUuid(),t.path,position(p)));tell(p,"Удалён только ваш тестовый прогресс");return 1;}

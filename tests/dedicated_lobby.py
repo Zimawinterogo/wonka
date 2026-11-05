@@ -13,6 +13,8 @@ root = Path(__file__).resolve().parents[1]
 server = root / "build" / "qa-dedicated"
 mods = server / "mods"
 mods.mkdir(parents=True, exist_ok=True)
+boards = [('north',4,3,-1,0,0,1), ('east',8,3,0,-1,-1,0),
+          ('south',12,3,1,0,0,-1), ('west',8,10,0,1,1,0)]
 base = "https://maven.fabricmc.net/"
 installer = "fabric-installer-1.0.3.jar"
 urllib.request.urlretrieve(base + "net/fabricmc/fabric-installer/1.0.3/" + installer, server / installer)
@@ -24,7 +26,7 @@ shutil.copy2(next((root / "build/release").glob("Whiteout-*.jar")), mods)
 (server / "server.properties").write_text("server-ip=127.0.0.1\nserver-port=0\nview-distance=2\nsimulation-distance=2\nlevel-seed=314159\n")
 
 def boot(first, test_duo=False):
-    process = subprocess.Popen(["java", "-Dwhiteout.testDuoTrace=true", "-Xmx2G", "-jar", "fabric-server-launch.jar", "nogui"], cwd=server, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    process = subprocess.Popen(["java", "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8", "-Dwhiteout.testDuoTrace=true", "-Xmx2G", "-jar", "fabric-server-launch.jar", "nogui"], cwd=server, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", bufsize=1)
     lines = queue.Queue()
     def drain():
         for line in process.stdout:
@@ -51,19 +53,25 @@ def boot(first, test_duo=False):
             exercise_duo(command, wait, test_duo == 'restart')
         elif first:
             command("tick freeze")
-            command("fill 3 100 4 4 101 4 minecraft:stone")
-            for i in range(4):
-                command(f"setblock {4-i%2} {100+i//2} 3 whiteout:story_board[facing=north,part={i}]")
+            for face,x,z,dx,dz,bx,bz in boards:
+                for i in range(4):
+                    cx,cz=x+dx*(i%2),z+dz*(i%2)
+                    command(f"setblock {cx+bx} {100+i//2} {cz+bz} minecraft:stone")
+                    command(f"setblock {cx} {100+i//2} {cz} whiteout:story_board[facing={face},part={i}]")
             command("tick unfreeze")
-        for i in range(0 if test_duo else 4):
-            marker = f"BOARD_CELL_{i}_PRESENT"
-            command(f"execute if block {4-i%2} {100+i//2} 3 whiteout:story_board[part={i}] run say {marker}")
-            wait(marker, 15)
+        for face,x,z,dx,dz,bx,bz in ([] if test_duo else boards):
+            for i in range(4):
+                marker = f"BOARD_{face}_{i}_PRESENT"
+                command(f"execute if block {x+dx*(i%2)} {100+i//2} {z+dz*(i%2)} whiteout:story_board[facing={face},part={i}] run say {marker}")
+                wait(marker, 15)
         if not first and not test_duo:
-            command("setblock 4 100 4 minecraft:air")
+            for face,x,z,dx,dz,bx,bz in boards:
+                command(f"setblock {x+bx} 100 {z+bz} minecraft:air")
             wait("Changed the block", 15)
+            removed = ' '.join(f'if block {x+dx*(i%2)} {100+i//2} {z+dz*(i%2)} minecraft:air'
+                               for face,x,z,dx,dz,bx,bz in boards for i in range(4))
             for attempt in range(25):
-                command("execute if block 3 101 3 minecraft:air run say BOARD_REMOVED")
+                command(f"execute {removed} run say BOARD_REMOVED")
                 try:
                     wait("BOARD_REMOVED", 1)
                     break
@@ -102,14 +110,14 @@ def exercise_duo(command, wait, restart):
         except (queue.Empty, TimeoutError):
             diagnostic = list((server/"world"/"whiteout-duo-tests").glob("*.json"))
             if diagnostic:
-                print("Persisted test events:", json.loads(diagnostic[0].read_text()).get("completedEvents", []), flush=True)
+                print("Persisted test events:", json.loads(diagnostic[0].read_text(encoding="utf-8")).get("completedEvents", []), flush=True)
             raise AssertionError(f"Unexpected command result: {text}; expected {ok}")
     def move(x):
         command(f"tp {name} {x} 64 1")
         time.sleep(.5)
     def progress():
         path, = (server/"world"/"whiteout-duo-tests").glob("*.json")
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     if restart:
         action("status", False)
         command('execute unless entity @e[type=minecraft:armor_stand,name="Whiteout Test Bot"] run say QA_NO_ORPHAN')
@@ -135,6 +143,9 @@ def exercise_duo(command, wait, restart):
         action("launch", False)
         action("ready")
         action("launch")
+        action("choose dialogue_choice:missing:0:0", False)
+        action("act whiteout:example/loss_exit", False)
+        action("choose dialogue_choice:final_second:0:0", False)
         action("disconnect")
         action("choose dialogue_choice:final_second:0:0", False)
         action("reconnect")
@@ -192,7 +203,8 @@ boot(False)
 # Carpet supplies only the headless operator for this CI process. The Whiteout
 # participant under test is the release's UUID adapter and does not use Carpet.
 carpet = mods / "carpet-qa.jar"
-urllib.request.urlretrieve("https://cdn.modrinth.com/data/TQTTVgYE/versions/f2mvlGrg/fabric-carpet-1.21-1.4.147%2Bv240613.jar", carpet)
+if not carpet.exists():
+    urllib.request.urlretrieve("https://cdn.modrinth.com/data/TQTTVgYE/versions/f2mvlGrg/fabric-carpet-1.21-1.4.147%2Bv240613.jar", carpet)
 assert hashlib.sha512(carpet.read_bytes()).hexdigest() == "e6f33d13406796a34e7598d997113f25f7bea3e55f9d334b73842adda52b2c5d0a86b7b12ac812d7e758861e3f468bf201c6c710c40162bb79d6818938204151"
 catalog = json.loads((root/"docs/examples/duo-final-events.json").read_text(encoding="utf8"))
 options = ["dialogue_choice:qa_vote:0:0","dialogue_choice:qa_vote:0:1"]

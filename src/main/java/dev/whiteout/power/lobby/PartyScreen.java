@@ -86,12 +86,12 @@ final class PartyScreen extends SharpScreen{
    LobbyUi.accent(d,x+5,y+22,20,0xff537992);
    LobbyUi.caption(d,textRenderer,"FIRST",x+13,y+23,47,LobbyUi.LIGHT_DIM);
    LobbyUi.fit(d,textRenderer,state.host()==null?"Выбор ведущего":name(state.host()),x+65,y+23,186,LobbyUi.INK,false,0);
-   LobbyUi.led(d,x+254,y+24,state.mine()?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
+   LobbyUi.led(d,x+254,y+24,Party.readyFor(state,client.player.getUuid(),state.host())?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
    LobbyUi.chalk(d,x+4,y+51,275,29);
    LobbyUi.accent(d,x+5,y+54,20,0xffbd514c);
    LobbyUi.caption(d,textRenderer,"SECOND",x+13,y+55,48,LobbyUi.LIGHT_DIM);
    LobbyUi.fit(d,textRenderer,state.partner()!=null?name(state.partner()):state.invited()!=null?"Приглашение отправлено":"Напарник не выбран",x+65,y+55,186,LobbyUi.INK,false,0);
-   LobbyUi.led(d,x+254,y+56,state.partner()!=null&&state.other()?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
+   LobbyUi.led(d,x+254,y+56,Party.readyFor(state,client.player.getUuid(),state.partner())?LobbyUi.LED_OK:LobbyUi.LED_WAIT);
    String status=state.partner()!=null?"ГОТОВНОСТЬ "+((state.mine()?1:0)+(state.other()?1:0))+"/2":
      state.invited()!=null?"ОЖИДАНИЕ ПОДТВЕРЖДЕНИЯ":"SOLO";
    LobbyUi.fit(d,textRenderer,status,x+13,y+91,253,LobbyUi.INK_SOFT,false,0);
