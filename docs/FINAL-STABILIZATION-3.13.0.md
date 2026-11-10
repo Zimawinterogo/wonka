@@ -57,7 +57,6 @@ No merge into main, public release, music replacement or balance change.
 Java 21, Gradle 8.10.2, Minecraft 1.21.1, Fabric Loader 0.18.4:
 
 ```text
-python tools/private_music.py Whiteout-3.12.9-1.21.1.jar --extract src/main/resources
 gradlew build -I qa/foundation.gradle -I qa/dialogue-routes.gradle foundationTests routeProbeClient routeProbeServer --no-daemon --console=plain
 python -X utf8 tests/run_resources.py
 python tools/private_music.py Whiteout-3.12.9-1.21.1.jar --compare build/release/Whiteout-3.13.0-1.21.1.jar
@@ -67,7 +66,11 @@ python -u tests/dedicated_lobby.py
 The complete mod is `build/release/Whiteout-3.13.0-1.21.1.jar`, not the overlay
 in `build/libs`. CI retains it as a development artifact, not a public release.
 The soundtrack is restored from the existing JAR only during assembly and is
-not committed as separate audio files.
+not committed as separate audio files. `processResources` runs
+`preparePrivateSoundtrack`, which copies any missing `music_slot_1..7.ogg` from
+`Whiteout-3.12.9-1.21.1.jar` (project root, `build/release/`, `release/` or
+`base/`) or from `-PwhiteoutMusicSource=<path>`; manual extraction with
+`tools/private_music.py --extract` is no longer required.
 
 ### Results from this audit
 
