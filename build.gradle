@@ -23,20 +23,23 @@ tasks.withType(JavaCompile).configureEach { options.release = 21; options.compil
 // committed: extracted files stay under src/main/resources (see .gitignore).
 def privateMusicNames = (1..7).collect { "assets/whiteout/sounds/music_slot_${it}.ogg" }
 def privateMusicSource = providers.gradleProperty('whiteoutMusicSource')
+def locateMusicSource = {
+ def candidates = []
+ if (privateMusicSource.isPresent()) candidates << file(privateMusicSource.get())
+ candidates.addAll([
+  file('Whiteout-3.12.9-1.21.1.jar'),
+  file('build/release/Whiteout-3.12.9-1.21.1.jar'),
+  file('release/Whiteout-3.12.9-1.21.1.jar'),
+  file('base/Whiteout-3.12.9-1.21.1.jar')
+ ])
+ candidates.find { it.isFile() }
+}
 tasks.register('preparePrivateSoundtrack') {
  doLast {
   def resourceRoot = file('src/main/resources')
   def missing = privateMusicNames.findAll { !new File(resourceRoot, it).isFile() }
   if (missing.isEmpty()) return
-  def candidates = []
-  if (privateMusicSource.isPresent()) candidates << file(privateMusicSource.get())
-  candidates.addAll([
-   file('Whiteout-3.12.9-1.21.1.jar'),
-   file('build/release/Whiteout-3.12.9-1.21.1.jar'),
-   file('release/Whiteout-3.12.9-1.21.1.jar'),
-   file('base/Whiteout-3.12.9-1.21.1.jar')
-  ])
-  def source = candidates.find { it.isFile() }
+  def source = locateMusicSource()
   if (source == null) {
    throw new GradleException('Private soundtrack is not present. Put the original Whiteout-3.12.9-1.21.1.jar in the project root, or run with -PwhiteoutMusicSource="<full path to that JAR>". The seven OGG files are intentionally excluded from Git.')
   }
@@ -567,6 +570,24 @@ tasks.register('assembleWhiteout') {
                       'assets/whiteout/blockstates/frost_window.json',
                       'assets/whiteout/blockstates/wall_thermometer.json']) {
    if(!entries.containsKey(asset))throw new GradleException('Missing 3.9.0 object: '+asset)
+  }
+  // Always bundle the soundtrack: if processResources did not supply a track
+  // (fresh checkout, ignored OGG files), take it straight from the local 3.12.9 JAR.
+  def missingTracks=(1..7).findAll { !entries.containsKey('assets/whiteout/sounds/music_slot_'+it+'.ogg') }
+  if(!missingTracks.isEmpty()){
+   def musicJar=locateMusicSource()
+   if(musicJar==null)throw new GradleException('Missing bundled soundtrack '+missingTracks.join(', ')+
+    '. Put Whiteout-3.12.9-1.21.1.jar in the project root or run with -PwhiteoutMusicSource="<full path to that JAR>".')
+   def musicZip=new java.util.zip.ZipFile(musicJar)
+   try {
+    missingTracks.each { track->
+     def name='assets/whiteout/sounds/music_slot_'+track+'.ogg'
+     def entry=musicZip.getEntry(name)
+     if(entry==null)throw new GradleException('Soundtrack JAR '+musicJar+' has no '+name)
+     entries[name]=musicZip.getInputStream(entry).bytes
+    }
+   } finally { musicZip.close() }
+   println('Added soundtrack '+missingTracks.join(', ')+' from: '+musicJar)
   }
   for(int track=1;track<=7;track++){
    if(!entries.containsKey('assets/whiteout/sounds/music_slot_'+track+'.ogg'))

@@ -72,7 +72,7 @@ public final class BoardScreen extends SharpScreen {
   }
   if(data.card()!=null){
    button("ОТКРЫТЬ ИСТОРИЮ",x+24,y+h-69,lw-36,()->{detail=true;clearAndInit();});
-   int y0=y+(roomy?111:103),gap=roomy?40:29;
+   int y0=y+(roomy?111:103),gap=Math.max(22,Math.min(roomy?40:29,((y+h-45-20)-y0)/2));
    button("УЧАСТНИКИ",rx+7,y0,rw-14,()->client.setScreen(new PartyScreen(data,0)));
    button("СЛОЖНОСТЬ",rx+7,y0+gap,rw-14,()->client.setScreen(new PartyScreen(data,2)));
    button("НАСТРОЙКИ",rx+7,y0+gap*2,rw-14,()->client.setScreen(new PersonalScreen(data)));

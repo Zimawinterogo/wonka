@@ -5,7 +5,7 @@
     "paper": "minecraft:block/sandstone_top",
     "pin": "minecraft:block/copper_block",
     "ink": "minecraft:block/stripped_spruce_log",
-    "board": "whiteout:gui/board/cork"
+    "board": "whiteout:block/story_board_cork"
   },
   "elements": [
     {

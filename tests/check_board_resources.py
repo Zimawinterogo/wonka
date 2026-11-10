@@ -28,6 +28,9 @@ with ZipFile(release) as mod, ZipFile(clients[0]) as vanilla:
                     seen.add(ref)
                     ref = textures[ref[1:]]
                 namespace, path = ref.split(':')
+                if namespace == 'whiteout':
+                    assert path.split('/')[0] in ('block', 'item'), (
+                        f'{ref} is outside the block atlas and renders as missing texture')
                 archive = vanilla if namespace == 'minecraft' else mod
                 data = archive.read(f'assets/{namespace}/textures/{path}.png')
                 assert data.startswith(b'\x89PNG\r\n\x1a\n'), ref
