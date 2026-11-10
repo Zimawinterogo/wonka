@@ -48,7 +48,12 @@ tasks.register('preparePrivateSoundtrack') {
     def target = new File(resourceRoot, name)
     if (!target.isFile()) {
      target.parentFile.mkdirs()
-     zip.getInputStream(entry).withCloseable { input -> target.withOutputStream { output -> output << input } }
+     // Write via a temporary file: an interrupted copy must not leave a
+     // truncated OGG that later runs would treat as already restored.
+     def partial = new File(temporaryDir, target.name + '.partial')
+     zip.getInputStream(entry).withCloseable { input -> partial.withOutputStream { output -> output << input } }
+     if (partial.length() != entry.size) throw new GradleException('Incomplete soundtrack copy: ' + name)
+     java.nio.file.Files.move(partial.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
     }
    }
   } finally { zip.close() }
@@ -56,6 +61,8 @@ tasks.register('preparePrivateSoundtrack') {
  }
 }
 tasks.named('processResources') { dependsOn 'preparePrivateSoundtrack' }
+// The recordings are game resources, not sources; keep them out of the sources JAR.
+tasks.named('sourcesJar') { exclude 'assets/whiteout/sounds/music_slot_*.ogg' }
 
 // This module is compiled/remapped normally, then merged into the exact existing release.
 // Preserve base assets/classes except the explicit, signature-checked patches below.
