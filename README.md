@@ -1,3 +1,12 @@
+# Whiteout 3.13.0 — stabilization candidate
+
+[Final audit, fixes, automated checks and required playtests](docs/FINAL-STABILIZATION-3.13.0.md).
+This branch contains the textured physical lobby and Duo fixes through PR #5.
+Use the complete `build/release/Whiteout-3.13.0-1.21.1.jar` for personal testing.
+Real two-client gameplay, user 3.12.18 saves and Iris/BSL still need acceptance.
+
+The version notes below are historical.
+
 # Whiteout 3.12.17 — Minecraft 1.21.1 / Fabric / Java 21
 
 Исправлена сцена «Тьма у озера»: строгая последовательность заправки и попытки

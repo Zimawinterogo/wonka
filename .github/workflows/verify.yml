@@ -22,8 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Restore existing personal music for local assembly only
-        run: python tools/private_music.py Whiteout-3.12.9-1.21.1.jar --extract src/main/resources
+      # No manual music extraction: processResources restores the seven tracks
+      # through preparePrivateSoundtrack, and the compare step below verifies them.
       - name: Fetch Gradle distribution with retry on transient CDN failures
         shell: bash
         run: |

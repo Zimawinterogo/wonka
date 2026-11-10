@@ -37,8 +37,8 @@ public final class DuoTestMode {
  private ScopedStory.Position botPosition;
  private TriggerEvidence humanEvidence=new TriggerEvidence(),botEvidence=new TriggerEvidence();
  private final Map<UUID,String> ballots=new HashMap<>();
- private final Map<UUID,Reader> readers=new HashMap<>();
- private record Reader(UUID id,String script,boolean barrier,int since){}
+ private DialogueBarrier.Readers readers(){return DialogueBarrier.readers(store);}
+ private UUID timedReader;private int readerSince;
  private UUID camera;private int cameraSince;int loadDelay,readDelay=-1;private String manifest="";
  DuoTestMode(UUID operator,Path path,ScopedStory.Position position){
   this.operator=operator;this.path=path;this.store=StoryStoreReader.open(path);botPosition=position;
@@ -84,7 +84,7 @@ public final class DuoTestMode {
    if(n.together()&&(!inside(e.area(),position(p))||connected&&!inside(e.area(),botPosition)))return false;
    owner=role(n.recipient(),actor);
   }
-  if(readers.entrySet().stream().anyMatch(entry->entry.getValue().barrier&&(connected||!entry.getKey().equals(BOT)))){var reader=readers.get(actor);if(reader==null||!e.key().startsWith("dialogue_choice:"+reader.script+":"))return false;}
+  if(readers().entrySet().stream().anyMatch(entry->entry.getValue().blocks()&&(connected||!entry.getKey().equals(BOT)))){var reader=readers().get(actor);if(reader==null||!e.key().startsWith("dialogue_choice:"+reader.script()+":"))return false;}
   var data=ScopedStory.read(store.data,e.scope(),owner);
   if(e.once()&&data.completedEvents.contains(e.key())||!StoryRules.matches(data.storyVariables,e.conditions()))return false;
   var source=new StoryWorldSource(p,data);
@@ -115,8 +115,8 @@ public final class DuoTestMode {
   if(n!=null&&!actor.equals(role(n.actor(),actor)))return "неправильная роль: требуется "+n.actor();
   if(n!=null&&!Narrative.matches(store,d,n.when()))return "не выполнены сюжетные условия";
   if(n!=null&&n.together()&&(!inside(e.area(),position(p))||connected&&!inside(e.area(),botPosition)))return "оба участника должны находиться в зоне";
-  var reader=readers.get(actor);
-  if(readers.entrySet().stream().anyMatch(entry->entry.getValue().barrier&&(connected||!entry.getKey().equals(BOT)))&&(reader==null||!e.key().startsWith("dialogue_choice:"+reader.script+":")))return "активно обязательное чтение; проверьте read / read-self";
+  var reader=readers().get(actor);
+  if(readers().entrySet().stream().anyMatch(entry->entry.getValue().blocks()&&(connected||!entry.getKey().equals(BOT)))&&(reader==null||!e.key().startsWith("dialogue_choice:"+reader.script()+":")))return "активно обязательное чтение; проверьте read / read-self";
   var data=ScopedStory.read(store.data,e.scope(),n==null?actor:role(n.recipient(),actor));
   if(e.once()&&data.completedEvents.contains(e.key()))return "выбор или событие уже выполнено";
   if(!StoryRules.matches(data.storyVariables,e.conditions()))return "не выполнены условия переменных";
@@ -132,7 +132,13 @@ public final class DuoTestMode {
   if(n!=null&&connected&&n.voteGroup()!=null&&(!vote(actor,key)||!admitted(p,peer,e)))return StoryReceipts.Outcome.WAITING;
   var owner=n==null?actor:role(n.recipient(),actor);
   for(var scene:e.scenes())if(!CrisisRuntime.requestable(server,scene))return StoryReceipts.Outcome.DENIED;
-  var result=Narrative.commit(p,store,owner,e,at(actor,p));
+  var staged=DialogueBarrier.stage(store,e,owner);
+  StoryCommitTransaction.Result result;
+  try{
+   result=Narrative.commit(p,store,owner,e,at(actor,p));
+   if(result==StoryCommitTransaction.Result.COMMITTED&&staged!=null&&!e.once()&&e.actions().isEmpty()&&e.objectives().isEmpty()&&e.scenes().isEmpty()&&e.scope()==ScopedStory.Scope.WORLD&&e.checkpoint()==null&&n.endings().isEmpty())store.save();
+  }catch(Exception|Error failure){if(staged!=null)staged.rollback();throw failure;}
+  if(result!=StoryCommitTransaction.Result.COMMITTED&&staged!=null)staged.rollback();
   if(result!=StoryCommitTransaction.Result.COMMITTED)return StoryReceipts.Outcome.valueOf(result.name());
   if(e.trigger()!=null){var r=new TriggerEvidence.Rule(key,e.area(),e.trigger());evidence(actor).consume(r,server.getTicks());
    if(n!=null&&(n.together()||n.voteGroup()!=null||n.firstDialogue()!=null||n.secondDialogue()!=null))evidence(peer).consume(r,server.getTicks());}
@@ -141,17 +147,22 @@ public final class DuoTestMode {
    for(var who:List.of(operator,BOT)){
     if(n.visibility()!=Narrative.Visibility.SHARED&&!who.equals(owner))continue;
     var script=who.equals(LobbyState.get(store).first())?n.firstDialogue():n.secondDialogue();
-    if(script!=null){var reader=new Reader(UUID.randomUUID(),script,n.waitForReaders(),server.getTicks());readers.put(who,reader);
-     if(who.equals(operator))send(p,new DialogueBarrier.Cue(reader.id,"dialogue",script));else tell(p,"Бот читает "+script);}
+    var reader=readers().get(who);
+    if(script!=null&&reader!=null&&reader.script().equals(script)){
+     if(who.equals(operator))send(p,new DialogueBarrier.Cue(reader.id(),"dialogue",script));else tell(p,"Бот читает "+script);}
    }
   }
   if(e.trigger()!=null&&e.trigger().emit()!=null)arm(p,actor,TriggerEvidence.Kind.SIGNAL,e.trigger().emit());
   WhiteoutNetwork.sync(p);return StoryReceipts.Outcome.COMMITTED;
  }
  private static void send(ServerPlayerEntity p,DialogueBarrier.Cue cue){if(ServerPlayNetworking.canSend(p,DialogueBarrier.Cue.ID))ServerPlayNetworking.send(p,cue);}
- void read(UUID id){var r=readers.get(operator);if(r!=null&&r.id.equals(id))readers.remove(operator);}
- boolean readError(UUID id){var r=readers.get(operator);return r!=null&&r.id.equals(id);}
- boolean retryDialogue(ServerPlayerEntity player){var reader=readers.get(operator);if(reader==null)return false;send(player,new DialogueBarrier.Cue(reader.id,"dialogue",reader.script));return true;}
+ void read(ServerPlayerEntity p,UUID id){
+  try{if(DialogueBarrier.acknowledge(store,operator,id))retryDialogue(p);}
+  catch(Exception failure){tell(p,"Не удалось сохранить прочтение. Повторите retry-dialogue.");org.slf4j.LoggerFactory.getLogger("whiteout-test-duo").warn("Cannot persist test dialogue acknowledgement",failure);}
+ }
+ private boolean readParticipant(UUID who)throws java.io.IOException{var r=readers().get(who);return r!=null&&DialogueBarrier.acknowledge(store,who,r.id());}
+ boolean readError(UUID id){var r=readers().get(operator);return r!=null&&r.id().equals(id);}
+ boolean retryDialogue(ServerPlayerEntity player){var reader=readers().get(operator);if(reader==null)return false;send(player,new DialogueBarrier.Cue(reader.id(),"dialogue",reader.script()));return true;}
  static int participantCount(boolean connected,String humanDimension,String botDimension){return connected&&humanDimension.equals(botDimension)?2:1;}
  boolean botLoaded(UUID id,int tick){
   if(!id.equals(camera)){camera=id;cameraSince=tick;botSkip=false;}
@@ -178,7 +189,9 @@ public final class DuoTestMode {
  private void tick(ServerPlayerEntity p)throws Exception{
   var server=p.getServer();int tick=server.getTicks();if(!prepared)return;
   if(follow&&connected)botPosition=position(p);if(tick%4==0)display(p);if(!started())return;
-  var r=readers.get(BOT);if(connected&&r!=null&&readDelay>=0&&tick-r.since>=readDelay)readers.remove(BOT);
+  var r=readers().get(BOT);
+  if(r!=null&&!r.id().equals(timedReader)){timedReader=r.id();readerSince=tick;}
+  if(connected&&r!=null&&readDelay>=0&&tick-readerSince>=readDelay)readParticipant(BOT);
   var catalog=StoryAuthority.catalog(server);var visible=new StringJoiner("\n");
   for(var rule:catalog.rules()){
    var e=catalog.bound(rule.key());
@@ -199,7 +212,7 @@ public final class DuoTestMode {
   var playing=SharedScene.current(store);if(playing!=null)send(p,new DialogueBarrier.Cue(playing.id(),"finish",""));
   discardMarker();SharedScene.forget(store);sessions.remove(p.getServer());changeScope(p);TriggerAuthority.reset(p);WhiteoutNetwork.sync(p);
  }
- private String status(){var r=readers.get(BOT);return "Подготовлен="+prepared+", запуск="+started()+", оператор="+(humanFirst?"FIRST":"SECOND")+", бот="+(connected?"онлайн":"офлайн")+", готов="+ready+", позиция="+botPosition+", диалог="+(r==null?"—":r.script)+", голоса="+ballots+", камера="+SharedScene.current(store);}
+ private String status(){var r=readers().get(BOT);return "Подготовлен="+prepared+", запуск="+started()+", оператор="+(humanFirst?"FIRST":"SECOND")+", бот="+(connected?"онлайн":"офлайн")+", готов="+ready+", позиция="+botPosition+", диалог="+(r==null?"—":r.script())+", голоса="+ballots+", камера="+SharedScene.current(store);}
  private static final String[] COMMANDS={"enable confirm","disable","start","stop","role first","role second","follow","stay","here","ready","launch","disconnect","reconnect","alone","skip","status","reset confirm","read","reading manual","reading 60","load normal","load none","load 60","state","choices","choose","act","self","read-self","skip-self","signal","interact"};
  private static int command(ServerPlayerEntity p,String input){
   try{
@@ -211,7 +224,7 @@ public final class DuoTestMode {
    }
    need(t!=null,"Сначала выполните enable confirm");
    switch(op){
-    case "start"->{t.prepare();WhiteoutNetwork.sync(p);}
+    case "start"->{t.prepare();WhiteoutNetwork.sync(p);t.retryDialogue(p);}
     case "stop"->{t.detach(p);sessions.put(server,new DuoTestMode(p.getUuid(),t.path,position(p)));tell(p,"Бот удалён. Команда start вернёт тестовую сессию");return 1;}
     case "disable"->{t.detach(p);tell(p,"Сессия закрыта. Сохранён только отдельный тестовый файл");return 1;}
     case "role"->{need((LobbyState.get(t.store)==null||!LobbyState.get(t.store).started())&&Set.of("first","second").contains(arg),"Выберите first или second перед запуском");t.humanFirst=arg.equals("first");t.roster(false);}
@@ -220,7 +233,7 @@ public final class DuoTestMode {
     case "follow","here","stay"->{need(t.connected,"Бот отключён");if(!op.equals("stay"))t.botPosition=position(p);if(!op.equals("here"))t.follow=op.equals("follow");}
     case "disconnect","reconnect"->{boolean online=op.equals("reconnect");need(t.connected!=online,"Состояние уже установлено");t.connected=online;SharedScene.peerChanged(t.store);t.alone=false;t.ballots.clear();t.botSkip=false;t.camera=null;if(!t.started())t.ready=false;}
     case "alone"->{need(t.started()&&!t.connected,"Бот должен быть отключён");t.alone=true;}
-    case "read"->{need(t.connected&&t.readers.remove(BOT)!=null,"Бот не читает диалог");}
+    case "read"->{need(t.connected&&t.readParticipant(BOT),"Бот не читает диалог");}
     case "reading"->t.readDelay=arg.equals("manual")?-1:delay(arg);
     case "load"->t.loadDelay=arg.equals("normal")?0:arg.equals("none")?-1:delay(arg);
     case "skip"->{var scene=SharedScene.current(t.store);need(scene!=null&&t.botLoaded(scene.id(),server.getTicks()),"Бот не загрузил сцену");t.botSkip=true;}
@@ -229,7 +242,7 @@ public final class DuoTestMode {
      var entity=world==null?null:world.getEntity(UUID.fromString(arg));need(entity!=null&&entity.isAlive()&&entity.squaredDistanceTo(point.x(),point.y(),point.z())<=16,"Цель недоступна или слишком далеко");
      var eye=new net.minecraft.util.math.Vec3d(point.x(),point.y()+1.62,point.z());var ray=world.raycast(new net.minecraft.world.RaycastContext(eye,entity.getEyePos(),net.minecraft.world.RaycastContext.ShapeType.COLLIDER,net.minecraft.world.RaycastContext.FluidHandling.NONE,entity));
      need(ray.getType()==net.minecraft.util.hit.HitResult.Type.MISS&&t.arm(p,BOT,TriggerEvidence.Kind.INTERACT_ENTITY,arg)>0,"Нет доступного взаимодействия");}
-    case "read-self"->{need(t.readers.remove(t.operator)!=null,"Игрок не читает диалог");}
+    case "read-self"->{need(t.readParticipant(t.operator),"Игрок не читает диалог");t.retryDialogue(p);}
     case "skip-self"->{var scene=SharedScene.current(t.store);need(scene!=null,"Нет общей сцены");SharedScene.response(p,new DialogueBarrier.Cue(scene.id(),"skip",""));}
     case "choose","act","self"->{var e=StoryAuthority.definition(server,arg);need(e!=null,"Неизвестный ключ: "+arg);need(!op.equals("choose")||e.trigger()!=null&&e.trigger().type()==TriggerEvidence.Kind.CHOICE,"Нужен ключ варианта диалога");var actor=op.equals("self")?t.operator:BOT;var result=t.act(p,actor,arg);tell(p,"Результат: "+switch(result){case COMMITTED->"выполнено";case WAITING->"ожидание второго решения";default->"отклонено: "+t.rejection(p,actor,e);});return result==StoryReceipts.Outcome.COMMITTED||result==StoryReceipts.Outcome.WAITING?1:0;}
     case "choices"->{var keys=new ArrayList<String>();for(var rule:StoryAuthority.catalog(server).rules())if(rule.binding().type()==TriggerEvidence.Kind.CHOICE&&t.admitted(p,BOT,StoryAuthority.definition(server,rule.key())))keys.add(rule.key());tell(p,"Допустимые ответы: "+keys);return 1;}

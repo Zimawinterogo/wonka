@@ -19,11 +19,33 @@ public final class DialogueBarrier{
   public Id<? extends CustomPayload> getId(){return ID;}
  }
  private record Ballot(String key,long until,long revision){}
- public record Reading(UUID id,String script,boolean waitForReaders,long revision){
+ public record Queued(UUID id,String script,boolean waitForReaders,long revision){
+  public Queued{validateReading(id,script,revision);}
+ }
+ private static void validateReading(UUID id,String script,long revision){
+  Objects.requireNonNull(id);
+  if(script==null||!script.matches("[a-zA-Z0-9_.:/-]{1,128}")||revision<1)throw new IllegalArgumentException("invalid pending Duo dialogue");
+ }
+ public record Reading(UUID id,String script,boolean waitForReaders,long revision,List<Queued> queue){
+  public Reading(UUID id,String script,boolean waitForReaders,long revision){this(id,script,waitForReaders,revision,List.of());}
   public Reading{
-   Objects.requireNonNull(id);
-   if(script==null||!script.matches("[a-zA-Z0-9_.:/-]{1,128}")||revision<1)throw new IllegalArgumentException("invalid pending Duo dialogue");
+   validateReading(id,script,revision);
+   queue=queue==null?List.of():List.copyOf(queue);
+   if(queue.size()>255)throw new IllegalArgumentException("pending Duo dialogue queue full");
+   var ids=new HashSet<UUID>();ids.add(id);
+   for(var next:queue)if(next.revision()!=revision||!ids.add(next.id()))throw new IllegalArgumentException("invalid queued Duo dialogue");
   }
+  public Reading append(Reading next){
+   if(next.revision()!=revision||!next.queue().isEmpty())throw new IllegalArgumentException("incompatible dialogue queue");
+   var pending=new ArrayList<>(queue);pending.add(new Queued(next.id(),next.script(),next.waitForReaders(),next.revision()));
+   return new Reading(id,script,waitForReaders,revision,pending);
+  }
+  public Reading advance(UUID acknowledged){
+   if(!id.equals(acknowledged))return this;
+   if(queue.isEmpty())return null;
+   var next=queue.getFirst();return new Reading(next.id(),next.script(),next.waitForReaders(),next.revision(),queue.subList(1,queue.size()));
+  }
+  public boolean blocks(){return waitForReaders||queue.stream().anyMatch(Queued::waitForReaders);}
  }
  /** Persisted in Store.Data, alongside the same transaction as story progress. */
  public static final class Readers extends LinkedHashMap<UUID,Reading>{}
@@ -32,10 +54,19 @@ public final class DialogueBarrier{
   if(value==null||value.size()>16)throw new IllegalArgumentException("invalid pending Duo dialogue ledger");
   value.forEach((who,reading)->{
    if(who==null||reading==null)throw new IllegalArgumentException("null pending Duo dialogue");
-   new Reading(reading.id(),reading.script(),reading.waitForReaders(),reading.revision());
+   new Reading(reading.id(),reading.script(),reading.waitForReaders(),reading.revision(),reading.queue());
   });
  }
- private static Readers readers(Store store){return ((Access)(Object)store.data).whiteout$readers();}
+ static Readers readers(Store store){return ((Access)(Object)store.data).whiteout$readers();}
+ static boolean acknowledge(Store store,UUID player,UUID id)throws java.io.IOException{
+  var previous=readers(store);var current=previous.get(player);
+  if(current==null||!current.id().equals(id))return false;
+  var next=new Readers();next.putAll(previous);var following=current.advance(id);
+  if(following==null)next.remove(player);else next.put(player,following);
+  var access=(Access)(Object)store.data;access.whiteout$readers(next);
+  try{store.save();}catch(java.io.IOException|RuntimeException failure){access.whiteout$readers(previous);throw failure;}
+  return true;
+ }
  static final class Stage{
   private final Access access;private final Readers previous;
   private Stage(Access access,Readers previous){this.access=access;this.previous=previous;}
@@ -43,16 +74,20 @@ public final class DialogueBarrier{
  }
  /** Stage acknowledgements before Narrative.commit so one Store.save commits both. */
  static Stage stage(ServerPlayerEntity actor,Store store,StoryEventCatalog.Event e){
+  return stage(store,e,Narrative.owner(actor,e));
+ }
+ static Stage stage(Store store,StoryEventCatalog.Event e,UUID owner){
   var n=e.narrative();var d=LobbyState.get(store);
   if(n==null||d==null||!d.started())return null;
   var prior=readers(store);var next=new Readers();
   prior.forEach((who,reading)->{if(reading.revision()==d.revision())next.put(who,reading);});
   boolean changed=false;
   for(var who:new UUID[]{d.first(),d.second()}){
-   if(who==null||n.visibility()!=Narrative.Visibility.SHARED&&!who.equals(Narrative.owner(actor,e)))continue;
+   if(who==null||n.visibility()!=Narrative.Visibility.SHARED&&!who.equals(owner))continue;
    String script=who.equals(d.first())?n.firstDialogue():n.secondDialogue();
    if(script==null)continue;
-   next.put(who,new Reading(UUID.randomUUID(),script,n.waitForReaders(),d.revision()));changed=true;
+   var added=new Reading(UUID.randomUUID(),script,n.waitForReaders(),d.revision());
+   var existing=next.get(who);next.put(who,existing==null?added:existing.append(added));changed=true;
   }
   if(!changed)return null;
   var access=(Access)(Object)store.data;access.whiteout$readers(next);return new Stage(access,prior);
@@ -66,7 +101,7 @@ public final class DialogueBarrier{
   var store=Store.get(p.getServer());var d=LobbyState.get(store);if(d==null)return true;
   var pending=readers(store);var mine=pending.get(p.getUuid());
   if(mine!=null&&mine.revision()==d.revision()&&key.startsWith("dialogue_choice:"+mine.script()+":"))return true;
-  return pending.entrySet().stream().noneMatch(entry->entry.getValue().revision()==d.revision()&&entry.getValue().waitForReaders()&&p.getServer().getPlayerManager().getPlayer(entry.getKey())!=null);
+  return pending.entrySet().stream().noneMatch(entry->entry.getValue().revision()==d.revision()&&entry.getValue().blocks()&&p.getServer().getPlayerManager().getPlayer(entry.getKey())!=null);
  }
  static boolean vote(ServerPlayerEntity p,StoryEventCatalog.Event e){
   var n=e.narrative();if(n==null||n.voteGroup()==null)return true;
@@ -112,18 +147,18 @@ public final class DialogueBarrier{
     }
     return;
    }
-   var test=DuoTestMode.active(c.player());if(test!=null&&cue.kind.equals("read")){test.read(cue.id);return;}
+   var test=DuoTestMode.active(c.player());if(test!=null&&cue.kind.equals("read")){test.read(c.player(),cue.id);return;}
    if(!cue.kind.equals("read")){SharedScene.response(c.player(),cue);return;}
    var store=Store.get(c.server());var previous=readers(store);var reader=previous.get(c.player().getUuid());
    if(reader!=null&&reader.id().equals(cue.id)){
-    var next=new Readers();next.putAll(previous);next.remove(c.player().getUuid());
-    var access=(Access)(Object)store.data;access.whiteout$readers(next);
-    try{store.save();}
+    try{acknowledge(store,c.player().getUuid(),cue.id);}
     catch(Exception failed){
-     access.whiteout$readers(previous);
      c.player().sendMessage(net.minecraft.text.Text.literal("Не удалось сохранить прочтение диалога. Повторите: /whiteout lobby retry-dialogue."));
      org.slf4j.LoggerFactory.getLogger("whiteout-dialogue").warn("Cannot persist dialogue acknowledgement",failed);
+     return;
     }
+    var following=readers(store).get(c.player().getUuid());
+    if(following!=null)send(c.player(),new Cue(following.id(),"dialogue",following.script()));
    }
   }));
   ServerPlayConnectionEvents.JOIN.register((h,sender,s)->{var store=Store.get(s);var d=LobbyState.get(store);var reader=readers(store).get(h.getPlayer().getUuid());
