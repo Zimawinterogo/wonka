@@ -18,6 +18,46 @@ java { toolchain.languageVersion = JavaLanguageVersion.of(21); withSourcesJar() 
 // Ask javac for a complete error list in one compile pass, not just the first 100.
 tasks.withType(JavaCompile).configureEach { options.release = 21; options.compilerArgs += ['-Xmaxerrs', '1000'] }
 
+// Restore the seven private recordings from a local 3.12.9 full JAR when the
+// ignored OGG files are absent from a fresh ZIP checkout. Nothing private is
+// committed: extracted files stay under src/main/resources (see .gitignore).
+def privateMusicNames = (1..7).collect { "assets/whiteout/sounds/music_slot_${it}.ogg" }
+def privateMusicSource = providers.gradleProperty('whiteoutMusicSource')
+tasks.register('preparePrivateSoundtrack') {
+ dependsOn tasks.named('processResources').getTaskDependencies().getDependencies(tasks.named('processResources'))
+ doLast {
+  def resourceRoot = file('src/main/resources')
+  def missing = privateMusicNames.findAll { !new File(resourceRoot, it).isFile() }
+  if (missing.isEmpty()) return
+  def candidates = []
+  if (privateMusicSource.isPresent()) candidates << file(privateMusicSource.get())
+  candidates.addAll([
+   file('Whiteout-3.12.9-1.21.1.jar'),
+   file('build/release/Whiteout-3.12.9-1.21.1.jar'),
+   file('release/Whiteout-3.12.9-1.21.1.jar'),
+   file('base/Whiteout-3.12.9-1.21.1.jar')
+  ])
+  def source = candidates.find { it.isFile() }
+  if (source == null) {
+   throw new GradleException('Private soundtrack is not present. Put the original Whiteout-3.12.9-1.21.1.jar in the project root, or run with -PwhiteoutMusicSource="<full path to that JAR>". The seven OGG files are intentionally excluded from Git.')
+  }
+  def zip = new java.util.zip.ZipFile(source)
+  try {
+   privateMusicNames.each { name ->
+    def entry = zip.getEntry(name)
+    if (entry == null) throw new GradleException('Source JAR is missing soundtrack entry: ' + name)
+    def target = new File(resourceRoot, name)
+    if (!target.isFile()) {
+     target.parentFile.mkdirs()
+     zip.getInputStream(entry).withCloseable { input -> target.withOutputStream { output -> output << input } }
+    }
+   }
+  } finally { zip.close() }
+  println('Restored private soundtrack from: ' + source)
+ }
+}
+tasks.named('processResources') { dependsOn 'preparePrivateSoundtrack' }
+
 // This module is compiled/remapped normally, then merged into the exact existing release.
 // Preserve base assets/classes except the explicit, signature-checked patches below.
 tasks.register('assembleWhiteout') {
